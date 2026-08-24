@@ -6,80 +6,56 @@
   <!-- Greeting -->
   <section class="flex flex-col gap-2">
     <h1 class="text-headline-lg-mobile text-on-surface">Selamat Datang, <?= esc(session('user_nama') ?? 'Admin') ?></h1>
-    <p class="text-body-md text-on-surface-variant">Berikut adalah ringkasan progres usulan pensiun dari database server lokal hari ini.</p>
+    <!-- <p class="text-body-md text-on-surface-variant">Berikut adalah ringkasan progres usulan pensiun dari database server lokal hari ini.</p> -->
   </section>
 
   <!-- Stat Cards Grid (Live Data from pensiun_db) -->
-  <section class="grid grid-cols-2 md:grid-cols-3 gap-4">
-    <!-- Stat Card 1: Total Usul -->
-    <div class="bg-surface-container rounded-xl p-4 shadow-sm flex flex-col gap-3 relative overflow-hidden group">
-      <div class="absolute -right-4 -top-4 w-16 h-16 bg-primary/5 rounded-full transition-transform group-hover:scale-150"></div>
-      <div class="w-10 h-10 rounded-full bg-primary-fixed flex items-center justify-center">
-        <i class="fa-solid fa-file-lines text-on-primary-fixed text-[20px]"></i>
-      </div>
-      <div class="flex flex-col">
-        <span class="text-label-sm text-on-surface-variant uppercase">Total Usul</span>
-        <span class="text-headline-lg-mobile text-on-surface"><?= $stats['total'] ?></span>
+  <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-5">
+    <!-- Card 1: JUMLAH PENGUSULAN OPD -->
+    <div class="bg-surface-container-lowest border border-outline-variant/40 rounded-xl p-5 shadow-xs flex flex-col justify-between hover:shadow-sm transition-shadow">
+      <span class="text-[13px] md:text-[14px] font-bold text-[#0066FF] tracking-wider uppercase">JUMLAH PENGUSULAN OPD</span>
+      <div class="mt-3">
+        <span class="text-2xl md:text-[26px] font-extrabold text-on-surface tracking-tight"><?= esc($stats['pengusulan_opd'] ?? 0) ?> <span class="text-xl md:text-2xl font-bold text-on-surface">Orang</span></span>
       </div>
     </div>
 
-    <!-- Stat Card 2: Pengusulan -->
-    <div class="bg-surface-container rounded-xl p-4 shadow-sm flex flex-col gap-3 relative overflow-hidden group">
-      <div class="absolute -right-4 -top-4 w-16 h-16 bg-secondary/5 rounded-full transition-transform group-hover:scale-150"></div>
-      <div class="w-10 h-10 rounded-full bg-secondary-fixed flex items-center justify-center">
-        <i class="fa-solid fa-file-pen text-on-secondary-fixed text-[20px]"></i>
-      </div>
-      <div class="flex flex-col">
-        <span class="text-label-sm text-on-surface-variant uppercase">Pengusulan</span>
-        <span class="text-headline-lg-mobile text-on-surface"><?= $stats['pengusulan'] ?></span>
+    <!-- Card 2: VERIFIKASI BKPSDMA -->
+    <div class="bg-surface-container-lowest border border-outline-variant/40 rounded-xl p-5 shadow-xs flex flex-col justify-between hover:shadow-sm transition-shadow">
+      <span class="text-[13px] md:text-[14px] font-bold text-[#16a34a] tracking-wider uppercase">VERIFIKASI BKPSDMA</span>
+      <div class="mt-3">
+        <span class="text-2xl md:text-[26px] font-extrabold text-on-surface tracking-tight"><?= esc($stats['verifikasi'] ?? 0) ?> <span class="text-xl md:text-2xl font-bold text-on-surface">Orang</span></span>
       </div>
     </div>
 
-    <!-- Stat Card 3: Verifikasi -->
-    <div class="bg-surface-container rounded-xl p-4 shadow-sm flex flex-col gap-3 relative overflow-hidden group">
-      <div class="absolute -right-4 -top-4 w-16 h-16 bg-tertiary/5 rounded-full transition-transform group-hover:scale-150"></div>
-      <div class="w-10 h-10 rounded-full bg-tertiary-fixed flex items-center justify-center">
-        <i class="fa-solid fa-circle-check text-on-tertiary-fixed text-[20px]"></i>
-      </div>
-      <div class="flex flex-col">
-        <span class="text-label-sm text-on-surface-variant uppercase">Verifikasi</span>
-        <span class="text-headline-lg-mobile text-on-surface"><?= $stats['verifikasi'] ?></span>
+    <!-- Card 3: PERTEK BKN -->
+    <div class="bg-surface-container-lowest border border-outline-variant/40 rounded-xl p-5 shadow-xs flex flex-col justify-between hover:shadow-sm transition-shadow">
+      <span class="text-[13px] md:text-[14px] font-bold text-[#0891b2] tracking-wider uppercase">PERTEK BKN</span>
+      <div class="mt-3">
+        <span class="text-2xl md:text-[26px] font-extrabold text-on-surface tracking-tight"><?= esc($stats['pertek_bkn'] ?? 0) ?> <span class="text-xl md:text-2xl font-bold text-on-surface">Orang</span></span>
       </div>
     </div>
 
-    <!-- Stat Card 4: Terbit SK -->
-    <div class="bg-surface-container rounded-xl p-4 shadow-sm flex flex-col gap-3 relative overflow-hidden group">
-      <div class="absolute -right-4 -top-4 w-16 h-16 bg-primary/5 rounded-full transition-transform group-hover:scale-150"></div>
-      <div class="w-10 h-10 rounded-full bg-primary-container flex items-center justify-center">
-        <i class="fa-solid fa-file-circle-check text-on-primary-container text-[20px]"></i>
-      </div>
-      <div class="flex flex-col">
-        <span class="text-label-sm text-on-surface-variant uppercase">Terbit SK</span>
-        <span class="text-headline-lg-mobile text-on-surface"><?= $stats['terbit_sk'] ?></span>
+    <!-- Card 4: PENERBITAN SK -->
+    <div class="bg-surface-container-lowest border border-outline-variant/40 rounded-xl p-5 shadow-xs flex flex-col justify-between hover:shadow-sm transition-shadow">
+      <span class="text-[13px] md:text-[14px] font-bold text-[#d97706] tracking-wider uppercase">PENERBITAN SK</span>
+      <div class="mt-3">
+        <span class="text-2xl md:text-[26px] font-extrabold text-on-surface tracking-tight"><?= esc($stats['penerbitan_sk'] ?? 0) ?> <span class="text-xl md:text-2xl font-bold text-on-surface">Orang</span></span>
       </div>
     </div>
 
-    <!-- Stat Card 5: Cetak SK -->
-    <div class="bg-surface-container rounded-xl p-4 shadow-sm flex flex-col gap-3 relative overflow-hidden group">
-      <div class="absolute -right-4 -top-4 w-16 h-16 bg-secondary/5 rounded-full transition-transform group-hover:scale-150"></div>
-      <div class="w-10 h-10 rounded-full bg-secondary-container flex items-center justify-center">
-        <i class="fa-solid fa-print text-on-secondary-container text-[20px]"></i>
-      </div>
-      <div class="flex flex-col">
-        <span class="text-label-sm text-on-surface-variant uppercase">Cetak SK</span>
-        <span class="text-headline-lg-mobile text-on-surface"><?= $stats['cetak_sk'] ?></span>
+    <!-- Card 5: SELESAI -->
+    <div class="bg-surface-container-lowest border border-outline-variant/40 rounded-xl p-5 shadow-xs flex flex-col justify-between hover:shadow-sm transition-shadow">
+      <span class="text-[13px] md:text-[14px] font-bold text-[#dc2626] tracking-wider uppercase">SELESAI</span>
+      <div class="mt-3">
+        <span class="text-2xl md:text-[26px] font-extrabold text-on-surface tracking-tight"><?= esc($stats['selesai'] ?? 0) ?> <span class="text-xl md:text-2xl font-bold text-on-surface">Orang</span></span>
       </div>
     </div>
 
-    <!-- Stat Card 6: Terima SK -->
-    <div class="bg-surface-container rounded-xl p-4 shadow-sm flex flex-col gap-3 relative overflow-hidden group">
-      <div class="absolute -right-4 -top-4 w-16 h-16 bg-tertiary/5 rounded-full transition-transform group-hover:scale-150"></div>
-      <div class="w-10 h-10 rounded-full bg-tertiary-container flex items-center justify-center">
-        <i class="fa-solid fa-check-double text-on-tertiary-container text-[20px]"></i>
-      </div>
-      <div class="flex flex-col">
-        <span class="text-label-sm text-on-surface-variant uppercase">Terima SK</span>
-        <span class="text-headline-lg-mobile text-on-surface"><?= $stats['terima_sk'] ?></span>
+    <!-- Card 6: JUMLAH PNS YANG AKTIF PENSIUN -->
+    <div class="bg-surface-container-lowest border border-outline-variant/40 rounded-xl p-5 shadow-xs flex flex-col justify-between hover:shadow-sm transition-shadow">
+      <span class="text-[13px] md:text-[14px] font-bold text-[#1e293b] tracking-wider uppercase">JUMLAH PNS YANG AKTIF PENSIUN</span>
+      <div class="mt-3">
+        <span class="text-2xl md:text-[26px] font-extrabold text-on-surface tracking-tight"><?= esc($stats['total_aktif'] ?? 0) ?> <span class="text-xl md:text-2xl font-bold text-on-surface">Orang</span></span>
       </div>
     </div>
   </section>

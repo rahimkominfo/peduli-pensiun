@@ -132,10 +132,9 @@
   <!-- Fixed Top Header -->
   <header class="fixed top-0 inset-x-0 z-50 bg-white/90 backdrop-blur-xl pt-safe shadow-[0_1px_8px_rgba(0,0,0,0.04)]">
     <div class="h-16 px-margin-mobile max-w-7xl mx-auto flex items-center justify-between">
-      <div class="flex flex-col">
-        <a href="<?= base_url('dashboard') ?>" class="font-headline-sm text-headline-sm text-primary tracking-tight leading-tight hover:opacity-90">PEDULI PENSIUN</a>
-        <span class="text-label-sm font-label-sm text-on-surface-variant">NIP: <?= esc(session('user_nip') ?? '19850421 201001 1 004') ?></span>
-      </div>
+      <a href="<?= base_url('dashboard') ?>" class="flex items-center hover:opacity-95 transition-opacity" title="Peduli Pensiun">
+        <img src="<?= base_url('assets/img/logo_pp.jpeg') ?>" alt="Peduli Pensiun" class="h-10 md:h-11 w-auto object-contain rounded-md" />
+      </a>
       <div class="flex items-center gap-2">
         <a href="<?= base_url('logout') ?>" title="Keluar" class="w-10 h-10 flex items-center justify-center text-error hover:bg-error-container/20 rounded-full transition-colors">
           <i class="fa-solid fa-right-from-bracket text-[18px]"></i>

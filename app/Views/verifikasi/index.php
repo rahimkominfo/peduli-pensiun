@@ -140,7 +140,15 @@
             <div class="flex items-center justify-between gap-2 pt-2 border-t border-outline-variant/20">
               <div class="flex items-center gap-2">
                 <!-- Tombol Lihat -->
-                <a href="<?= base_url('uploads/dokumen/' . $doc['FILE_DOKUMEN']) ?>" target="_blank" class="bg-surface-container-high text-on-surface px-3 py-1.5 rounded-lg text-label-sm font-label-sm flex items-center gap-1.5 hover:bg-surface-variant transition-colors shadow-sm">
+                <?php
+                  $candidateUnit = $candidate['UNIT_ID'] ?? '';
+                  $docFile = $doc['FILE_DOKUMEN'];
+                  $docUrl = base_url('uploads/dokumen/' . ($candidateUnit ? $candidateUnit . '/' : '') . $docFile);
+                  if (!empty($candidateUnit) && !file_exists(FCPATH . 'uploads/dokumen/' . $candidateUnit . '/' . $docFile) && file_exists(FCPATH . 'uploads/dokumen/' . $docFile)) {
+                      $docUrl = base_url('uploads/dokumen/' . $docFile);
+                  }
+                ?>
+                <a href="<?= $docUrl ?>" target="_blank" class="bg-surface-container-high text-on-surface px-3 py-1.5 rounded-lg text-label-sm font-label-sm flex items-center gap-1.5 hover:bg-surface-variant transition-colors shadow-sm">
                   <i class="fa-solid fa-eye text-[14px]"></i>
                   <span>Lihat</span>
                 </a>

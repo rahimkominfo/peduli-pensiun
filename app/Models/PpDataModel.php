@@ -91,35 +91,44 @@ class PpDataModel extends Model
      */
     public function getSummaryStats()
     {
-        $totalUsul = $this->countAllResults();
+        $totalPns = $this->countAllResults();
 
-        // Get latest progress code for each PP_ID
+        // Get highest progress code achieved for each active employee in PP_DATA
         $query = $this->db->query("
-            SELECT pr.PPR_KODE, COUNT(*) as total
+            SELECT 
+                latest.max_kode,
+                COUNT(*) as total
             FROM (
-                SELECT p1.PP_ID, p1.PPR_KODE
-                FROM PP_PROGRES_DATA p1
-                INNER JOIN (
-                    SELECT PP_ID, MAX(PPR_ID) as max_id
-                    FROM PP_PROGRES_DATA
-                    GROUP BY PP_ID
-                ) p2 ON p1.PPR_ID = p2.max_id
-            ) pr
-            GROUP BY pr.PPR_KODE
+                SELECT 
+                    d.PP_ID,
+                    COALESCE(MAX(p.PPR_KODE), 1) as max_kode
+                FROM PP_DATA d
+                LEFT JOIN PP_PROGRES_DATA p ON p.PP_ID = d.PP_ID
+                GROUP BY d.PP_ID
+            ) latest
+            GROUP BY latest.max_kode
         ")->getResultArray();
 
         $statsByKode = [];
         foreach ($query as $row) {
-            $statsByKode[$row['PPR_KODE']] = (int)$row['total'];
+            $statsByKode[(int)$row['max_kode']] = (int)$row['total'];
         }
 
         return [
-            'total'      => $totalUsul,
-            'pengusulan' => $statsByKode[1] ?? 0,
-            'verifikasi' => $statsByKode[2] ?? 0,
-            'terbit_sk'  => $statsByKode[3] ?? 0,
-            'cetak_sk'   => $statsByKode[4] ?? 0,
-            'terima_sk'  => $statsByKode[5] ?? 0,
+            'pengusulan_opd' => $statsByKode[1] ?? 0,
+            'verifikasi'     => $statsByKode[2] ?? 0,
+            'pertek_bkn'     => $statsByKode[3] ?? 0,
+            'penerbitan_sk'  => $statsByKode[4] ?? 0,
+            'selesai'        => $statsByKode[5] ?? 0,
+            'total_aktif'    => $totalPns,
+
+            // Backward compatibility keys
+            'total'          => $totalPns,
+            'pengusulan'     => $statsByKode[1] ?? 0,
+            'terbit_sk'      => $statsByKode[3] ?? 0,
+            'cetak_sk'       => $statsByKode[4] ?? 0,
+            'terima_sk'      => $statsByKode[5] ?? 0,
         ];
     }
 }
+

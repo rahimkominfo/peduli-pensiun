@@ -87,13 +87,18 @@ class Verifikasi extends BaseController
     public function uploadDokumen($id)
     {
         $dokumenModel = new PpDokumenModel();
-        $dokjesId = $this->request->getPost('dokjes_id');
+        $ppDataModel  = new PpDataModel();
+        $dokjesId     = $this->request->getPost('dokjes_id');
+
+        $candidate    = $ppDataModel->find($id);
+        $unitId       = $candidate['UNIT_ID'] ?? 0;
+        $nip          = $candidate['NIP'] ?? '';
 
         $file = $this->request->getFile('file_dokumen');
 
         if ($file && $file->isValid() && !$file->hasMoved()) {
             $newName = $file->getRandomName();
-            $uploadPath = ROOTPATH . 'public/uploads/dokumen';
+            $uploadPath = ROOTPATH . 'public/uploads/dokumen/' . $unitId;
             if (!is_dir($uploadPath)) {
                 mkdir($uploadPath, 0777, true);
             }
@@ -103,6 +108,7 @@ class Verifikasi extends BaseController
             $existing = $dokumenModel->where('PP_ID', $id)->where('DOKJES_ID', $dokjesId)->first();
             if ($existing) {
                 $dokumenModel->update($existing['DOKUMEN_ID'], [
+                    'NIP'           => $nip,
                     'FILE_DOKUMEN'  => $newName,
                     'APPROVE'       => 0, // Reset status to pending after upload
                     'KET_PENOLAKAN' => ''
@@ -110,6 +116,7 @@ class Verifikasi extends BaseController
             } else {
                 $dokumenModel->insert([
                     'PP_ID'         => $id,
+                    'NIP'           => $nip,
                     'DOKJES_ID'     => $dokjesId,
                     'FILE_DOKUMEN'  => $newName,
                     'APPROVE'       => 0,
