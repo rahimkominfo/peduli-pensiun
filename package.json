@@ -1,0 +1,27 @@
+{
+  "name": "peduli-pensiun2",
+  "version": "1.0.0",
+  "description": "CodeIgniter is a PHP full-stack web framework that is light, fast, flexible and secure. More information can be found at the [official site](https://codeigniter.com).",
+  "main": "index.js",
+  "directories": {
+    "test": "tests"
+  },
+  "scripts": {
+    "copy:fonts": "mkdir -p public/assets/webfonts && cp -r node_modules/@fortawesome/fontawesome-free/webfonts/* public/assets/webfonts/",
+    "build:css": "npm run copy:fonts && postcss src/input.css -o public/assets/css/style.css",
+    "watch:css": "npm run copy:fonts && postcss src/input.css -o public/assets/css/style.css --watch",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.3.3",
+    "postcss": "^8.5.26",
+    "postcss-cli": "^11.0.1",
+    "tailwindcss": "^4.3.3"
+  },
+  "dependencies": {
+    "@fortawesome/fontawesome-free": "^7.3.1"
+  }
+}
