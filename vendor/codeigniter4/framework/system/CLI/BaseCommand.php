@@ -1,7 +1,5 @@
 <?php
 
-declare(strict_types=1);
-
 /**
  * This file is part of CodeIgniter 4 framework.
  *
@@ -108,8 +106,6 @@ abstract class BaseCommand
     /**
      * Can be used by a command to run other commands.
      *
-     * @param array<int|string, string|null> $params
-     *
      * @return int|void
      *
      * @throws ReflectionException
@@ -142,7 +138,7 @@ abstract class BaseCommand
     {
         CLI::write(lang('CLI.helpUsage'), 'yellow');
 
-        if ($this->usage !== null) {
+        if (! empty($this->usage)) {
             $usage = $this->usage;
         } else {
             $usage = $this->name;
@@ -154,7 +150,7 @@ abstract class BaseCommand
 
         CLI::write($this->setPad($usage, 0, 0, 2));
 
-        if ($this->description !== null) {
+        if (! empty($this->description)) {
             CLI::newLine();
             CLI::write(lang('CLI.helpDescription'), 'yellow');
             CLI::write($this->setPad($this->description, 0, 0, 2));
@@ -163,7 +159,7 @@ abstract class BaseCommand
         if ($this->arguments !== []) {
             CLI::newLine();
             CLI::write(lang('CLI.helpArguments'), 'yellow');
-            $length = max(array_map(strlen(...), array_keys($this->arguments)));
+            $length = max(array_map('strlen', array_keys($this->arguments)));
 
             foreach ($this->arguments as $argument => $description) {
                 CLI::write(CLI::color($this->setPad($argument, $length, 2, 2), 'green') . $description);
@@ -173,7 +169,7 @@ abstract class BaseCommand
         if ($this->options !== []) {
             CLI::newLine();
             CLI::write(lang('CLI.helpOptions'), 'yellow');
-            $length = max(array_map(strlen(...), array_keys($this->options)));
+            $length = max(array_map('strlen', array_keys($this->options)));
 
             foreach ($this->options as $option => $description) {
                 CLI::write(CLI::color($this->setPad($option, $length, 2, 2), 'green') . $description);
@@ -196,8 +192,6 @@ abstract class BaseCommand
     /**
      * Get pad for $key => $value array output
      *
-     * @param array<string, string> $array
-     *
      * @deprecated Use setPad() instead.
      *
      * @codeCoverageIgnore
@@ -216,7 +210,7 @@ abstract class BaseCommand
     /**
      * Makes it simple to access our protected properties.
      *
-     * @return array<string, string>|Commands|LoggerInterface|string|null
+     * @return array|Commands|LoggerInterface|string|null
      */
     public function __get(string $key)
     {

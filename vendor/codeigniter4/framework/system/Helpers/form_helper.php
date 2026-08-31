@@ -1,7 +1,5 @@
 <?php
 
-declare(strict_types=1);
-
 /**
  * This file is part of CodeIgniter 4 framework.
  *
@@ -13,6 +11,7 @@ declare(strict_types=1);
 
 use CodeIgniter\Validation\Exceptions\ValidationException;
 use Config\App;
+use Config\Services;
 use Config\Validation;
 
 // CodeIgniter Form Helpers
@@ -31,12 +30,12 @@ if (! function_exists('form_open')) {
     {
         // If no action is provided then set to the current url
         if ($action === '') {
-            $action = (string) current_url(true);
+            $action = current_url(true);
         } // If an action is not a full URL then turn it into one
-        elseif (! str_contains($action, '://')) {
+        elseif (strpos($action, '://') === false) {
             // If an action has {locale}
-            if (str_contains($action, '{locale}')) {
-                $action = str_replace('{locale}', service('request')->getLocale(), $action);
+            if (strpos($action, '{locale}') !== false) {
+                $action = str_replace('{locale}', Services::request()->getLocale(), $action);
             }
 
             $action = site_url($action);
@@ -49,10 +48,10 @@ if (! function_exists('form_open')) {
 
         $attributes = stringify_attributes($attributes);
 
-        if (! str_contains(strtolower($attributes), 'method=')) {
+        if (stripos($attributes, 'method=') === false) {
             $attributes .= ' method="post"';
         }
-        if (! str_contains(strtolower($attributes), 'accept-charset=')) {
+        if (stripos($attributes, 'accept-charset=') === false) {
             $config = config(App::class);
             $attributes .= ' accept-charset="' . strtolower($config->charset) . '"';
         }
@@ -60,9 +59,9 @@ if (! function_exists('form_open')) {
         $form = '<form action="' . $action . '"' . $attributes . ">\n";
 
         // Add CSRF field if enabled, but leave it out for GET requests and requests to external websites
-        $before = service('filters')->getFilters()['before'];
+        $before = Services::filters()->getFilters()['before'];
 
-        if ((in_array('csrf', $before, true) || array_key_exists('csrf', $before)) && str_contains($action, base_url()) && ! str_contains(strtolower($form), strtolower('method="get"'))) {
+        if ((in_array('csrf', $before, true) || array_key_exists('csrf', $before)) && strpos($action, base_url()) !== false && ! stripos($form, 'method="get"')) {
             $form .= csrf_field($csrfId ?? null);
         }
 
@@ -223,11 +222,11 @@ if (! function_exists('form_textarea')) {
         }
 
         // Unsets default rows and cols if defined in extra field as array or string.
-        if ((is_array($extra) && array_key_exists('rows', $extra)) || (is_string($extra) && str_contains(strtolower(preg_replace('/\s+/', '', $extra)), 'rows='))) {
+        if ((is_array($extra) && array_key_exists('rows', $extra)) || (is_string($extra) && stripos(preg_replace('/\s+/', '', $extra), 'rows=') !== false)) {
             unset($defaults['rows']);
         }
 
-        if ((is_array($extra) && array_key_exists('cols', $extra)) || (is_string($extra) && str_contains(strtolower(preg_replace('/\s+/', '', $extra)), 'cols='))) {
+        if ((is_array($extra) && array_key_exists('cols', $extra)) || (is_string($extra) && stripos(preg_replace('/\s+/', '', $extra), 'cols=') !== false)) {
             unset($defaults['cols']);
         }
 
@@ -248,7 +247,7 @@ if (! function_exists('form_multiselect')) {
     {
         $extra = stringify_attributes($extra);
 
-        if (! str_contains(strtolower($extra), strtolower('multiple'))) {
+        if (stripos($extra, 'multiple') === false) {
             $extra .= ' multiple="multiple"';
         }
 
@@ -290,17 +289,12 @@ if (! function_exists('form_dropdown')) {
 
         // If no selected state was submitted we will attempt to set it automatically
         if ($selected === []) {
-            $superglobals = service('superglobals');
             if (is_array($data)) {
-                $postValue = $superglobals->post($data['name'] ?? '');
-                if (isset($data['name']) && $postValue !== null) {
-                    $selected = [$postValue];
+                if (isset($data['name'], $_POST[$data['name']])) {
+                    $selected = [$_POST[$data['name']]];
                 }
-            } else {
-                $postValue = $superglobals->post($data);
-                if ($postValue !== null) {
-                    $selected = [$postValue];
-                }
+            } elseif (isset($_POST[$data])) {
+                $selected = [$_POST[$data]];
             }
         }
 
@@ -310,7 +304,7 @@ if (! function_exists('form_dropdown')) {
         }
 
         $extra    = stringify_attributes($extra);
-        $multiple = (count($selected) > 1 && ! str_contains(strtolower($extra), 'multiple')) ? ' multiple="multiple"' : '';
+        $multiple = (count($selected) > 1 && stripos($extra, 'multiple') === false) ? ' multiple="multiple"' : '';
         $form     = '<select ' . rtrim(parse_form_attributes($data, $defaults)) . $extra . $multiple . ">\n";
 
         foreach ($options as $key => $val) {
@@ -355,7 +349,7 @@ if (! function_exists('form_checkbox')) {
     {
         $defaults = [
             'type'  => 'checkbox',
-            'name'  => is_array($data) ? '' : $data,
+            'name'  => (! is_array($data) ? $data : ''),
             'value' => $value,
         ];
 
@@ -556,7 +550,7 @@ if (! function_exists('set_value')) {
      */
     function set_value(string $field, $default = '', bool $htmlEscape = true)
     {
-        $request = service('request');
+        $request = Services::request();
 
         // Try any old input data we may have first
         $value = $request->getOldInput($field);
@@ -577,7 +571,7 @@ if (! function_exists('set_select')) {
      */
     function set_select(string $field, string $value = '', bool $default = false): string
     {
-        $request = service('request');
+        $request = Services::request();
 
         // Try any old input data we may have first
         $input = $request->getOldInput($field);
@@ -587,7 +581,7 @@ if (! function_exists('set_select')) {
         }
 
         if ($input === null) {
-            return $default ? ' selected="selected"' : '';
+            return ($default === true) ? ' selected="selected"' : '';
         }
 
         if (is_array($input)) {
@@ -613,7 +607,7 @@ if (! function_exists('set_checkbox')) {
      */
     function set_checkbox(string $field, string $value = '', bool $default = false): string
     {
-        $request = service('request');
+        $request = Services::request();
 
         // Try any old input data we may have first
         $input = $request->getOldInput($field);
@@ -633,7 +627,7 @@ if (! function_exists('set_checkbox')) {
             return '';
         }
 
-        $session     = service('session');
+        $session     = Services::session();
         $hasOldInput = $session->has('_ci_old_input');
 
         // Unchecked checkbox and radio inputs are not even submitted by browsers ...
@@ -641,7 +635,7 @@ if (! function_exists('set_checkbox')) {
             return ($input === $value) ? ' checked="checked"' : '';
         }
 
-        return $default ? ' checked="checked"' : '';
+        return ($default === true) ? ' checked="checked"' : '';
     }
 }
 
@@ -653,7 +647,7 @@ if (! function_exists('set_radio')) {
      */
     function set_radio(string $field, string $value = '', bool $default = false): string
     {
-        $request = service('request');
+        $request = Services::request();
 
         // Try any old input data we may have first
         $oldInput = $request->getOldInput($field);
@@ -678,7 +672,7 @@ if (! function_exists('set_radio')) {
             return ((string) $input === $value) ? ' checked="checked"' : '';
         }
 
-        return $default ? ' checked="checked"' : '';
+        return ($default === true) ? ' checked="checked"' : '';
     }
 }
 
@@ -707,7 +701,7 @@ if (! function_exists('validation_errors')) {
             return $errors;
         }
 
-        $validation = service('validation');
+        $validation = Services::validation();
 
         return $validation->getErrors();
     }
@@ -722,7 +716,7 @@ if (! function_exists('validation_list_errors')) {
     function validation_list_errors(string $template = 'list'): string
     {
         $config = config(Validation::class);
-        $view   = service('renderer');
+        $view   = Services::renderer();
 
         if (! array_key_exists($template, $config->templates)) {
             throw ValidationException::forInvalidTemplate($template);
@@ -742,12 +736,12 @@ if (! function_exists('validation_show_error')) {
     function validation_show_error(string $field, string $template = 'single'): string
     {
         $config = config(Validation::class);
-        $view   = service('renderer');
+        $view   = Services::renderer();
 
-        $errors = array_filter(validation_errors(), static fn ($key): bool => preg_match(
+        $errors = array_filter(validation_errors(), static fn ($key) => preg_match(
             '/^' . str_replace(['\.\*', '\*\.'], ['\..+', '.+\.'], preg_quote($field, '/')) . '$/',
-            $key,
-        ) === 1, ARRAY_FILTER_USE_KEY);
+            $key
+        ), ARRAY_FILTER_USE_KEY);
 
         if ($errors === []) {
             return '';
@@ -793,7 +787,7 @@ if (! function_exists('parse_form_attributes')) {
             if (! is_bool($val)) {
                 if ($key === 'value') {
                     $val = esc($val);
-                } elseif ($key === 'name' && $default['name'] === '') {
+                } elseif ($key === 'name' && ! strlen($default['name'])) {
                     continue;
                 }
                 $att .= $key . '="' . $val . '"' . ($key === array_key_last($default) ? '' : ' ');

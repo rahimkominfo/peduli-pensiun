@@ -1,7 +1,5 @@
 <?php
 
-declare(strict_types=1);
-
 /**
  * This file is part of CodeIgniter 4 framework.
  *
@@ -19,7 +17,6 @@ use Config\Cache;
 use Exception;
 use Predis\Client;
 use Predis\Collection\Iterator\Keyspace;
-use Predis\Response\Status;
 
 /**
  * Predis cache handler
@@ -31,24 +28,14 @@ class PredisHandler extends BaseHandler
     /**
      * Default config
      *
-     * @var array{
-     *   scheme: string,
-     *   host: string,
-     *   password: string|null,
-     *   port: int,
-     *   async: bool,
-     *   persistent: bool,
-     *   timeout: int
-     * }
+     * @var array
      */
     protected $config = [
-        'scheme'     => 'tcp',
-        'host'       => '127.0.0.1',
-        'password'   => null,
-        'port'       => 6379,
-        'async'      => false,
-        'persistent' => false,
-        'timeout'    => 0,
+        'scheme'   => 'tcp',
+        'host'     => '127.0.0.1',
+        'password' => null,
+        'port'     => 6379,
+        'timeout'  => 0,
     ];
 
     /**
@@ -65,40 +52,62 @@ class PredisHandler extends BaseHandler
     {
         $this->prefix = $config->prefix;
 
-        $this->config = array_merge($this->config, $config->redis);
+        if (isset($config->redis)) {
+            $this->config = array_merge($this->config, $config->redis);
+        }
     }
 
-    public function initialize(): void
+    /**
+     * {@inheritDoc}
+     */
+    public function initialize()
     {
         try {
             $this->redis = new Client($this->config, ['prefix' => $this->prefix]);
             $this->redis->time();
         } catch (Exception $e) {
-            throw new CriticalError('Cache: Predis connection refused (' . $e->getMessage() . ').', $e->getCode(), $e);
+            throw new CriticalError('Cache: Predis connection refused (' . $e->getMessage() . ').');
         }
     }
 
-    public function get(string $key): mixed
+    /**
+     * {@inheritDoc}
+     */
+    public function get(string $key)
     {
         $key = static::validateKey($key);
 
         $data = array_combine(
             ['__ci_type', '__ci_value'],
-            $this->redis->hmget($key, ['__ci_type', '__ci_value']),
+            $this->redis->hmget($key, ['__ci_type', '__ci_value'])
         );
 
         if (! isset($data['__ci_type'], $data['__ci_value']) || $data['__ci_value'] === false) {
             return null;
         }
 
-        return match ($data['__ci_type']) {
-            'array', 'object'                                => unserialize($data['__ci_value']),
-            'boolean', 'integer', 'double', 'string', 'NULL' => settype($data['__ci_value'], $data['__ci_type']) ? $data['__ci_value'] : null,
-            default                                          => null,
-        };
+        switch ($data['__ci_type']) {
+            case 'array':
+            case 'object':
+                return unserialize($data['__ci_value']);
+
+            case 'boolean':
+            case 'integer':
+            case 'double': // Yes, 'double' is returned and NOT 'float'
+            case 'string':
+            case 'NULL':
+                return settype($data['__ci_value'], $data['__ci_type']) ? $data['__ci_value'] : null;
+
+            case 'resource':
+            default:
+                return null;
+        }
     }
 
-    public function save(string $key, mixed $value, int $ttl = 60): bool
+    /**
+     * {@inheritDoc}
+     */
+    public function save(string $key, $value, int $ttl = 60)
     {
         $key = static::validateKey($key);
 
@@ -110,7 +119,7 @@ class PredisHandler extends BaseHandler
 
             case 'boolean':
             case 'integer':
-            case 'double':
+            case 'double': // Yes, 'double' is returned and NOT 'float'
             case 'string':
             case 'NULL':
                 break;
@@ -120,7 +129,7 @@ class PredisHandler extends BaseHandler
                 return false;
         }
 
-        if (! $this->redis->hmset($key, ['__ci_type' => $dataType, '__ci_value' => $value]) instanceof Status) {
+        if (! $this->redis->hmset($key, ['__ci_type' => $dataType, '__ci_value' => $value])) {
             return false;
         }
 
@@ -131,14 +140,22 @@ class PredisHandler extends BaseHandler
         return true;
     }
 
-    public function delete(string $key): bool
+    /**
+     * {@inheritDoc}
+     */
+    public function delete(string $key)
     {
         $key = static::validateKey($key);
 
         return $this->redis->del($key) === 1;
     }
 
-    public function deleteMatching(string $pattern): int
+    /**
+     * {@inheritDoc}
+     *
+     * @return int
+     */
+    public function deleteMatching(string $pattern)
     {
         $matchedKeys = [];
 
@@ -146,38 +163,49 @@ class PredisHandler extends BaseHandler
             $matchedKeys[] = $key;
         }
 
-        if ($matchedKeys === []) {
-            return 0;
-        }
-
         return $this->redis->del($matchedKeys);
     }
 
-    public function increment(string $key, int $offset = 1): int
+    /**
+     * {@inheritDoc}
+     */
+    public function increment(string $key, int $offset = 1)
     {
         $key = static::validateKey($key);
 
         return $this->redis->hincrby($key, 'data', $offset);
     }
 
-    public function decrement(string $key, int $offset = 1): int
+    /**
+     * {@inheritDoc}
+     */
+    public function decrement(string $key, int $offset = 1)
     {
         $key = static::validateKey($key);
 
         return $this->redis->hincrby($key, 'data', -$offset);
     }
 
-    public function clean(): bool
+    /**
+     * {@inheritDoc}
+     */
+    public function clean()
     {
         return $this->redis->flushdb()->getPayload() === 'OK';
     }
 
-    public function getCacheInfo(): array
+    /**
+     * {@inheritDoc}
+     */
+    public function getCacheInfo()
     {
         return $this->redis->info();
     }
 
-    public function getMetaData(string $key): ?array
+    /**
+     * {@inheritDoc}
+     */
+    public function getMetaData(string $key)
     {
         $key = static::validateKey($key);
 
@@ -197,42 +225,11 @@ class PredisHandler extends BaseHandler
         return null;
     }
 
+    /**
+     * {@inheritDoc}
+     */
     public function isSupported(): bool
     {
         return class_exists(Client::class);
-    }
-
-    public function ping(): bool
-    {
-        try {
-            $result = $this->redis->ping();
-
-            if (is_object($result)) {
-                return $result->getPayload() === 'PONG';
-            }
-
-            return $result === 'PONG';
-        } catch (Exception) {
-            return false;
-        }
-    }
-
-    public function reconnect(): bool
-    {
-        try {
-            $this->redis->disconnect();
-        } catch (Exception) {
-            // Connection already dead, that's fine
-        }
-
-        try {
-            $this->initialize();
-
-            return true;
-        } catch (CriticalError $e) {
-            log_message('error', 'Cache: Predis reconnection failed: ' . $e->getMessage());
-
-            return false;
-        }
     }
 }

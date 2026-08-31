@@ -1,7 +1,5 @@
 <?php
 
-declare(strict_types=1);
-
 /**
  * This file is part of CodeIgniter 4 framework.
  *
@@ -45,7 +43,9 @@ class CookieStore implements Countable, IteratorAggregate
      */
     public static function fromCookieHeaders(array $headers, bool $raw = false)
     {
-        /** @var list<Cookie> $cookies */
+        /**
+         * @var list<Cookie> $cookies
+         */
         $cookies = array_filter(array_map(static function (string $header) use ($raw) {
             try {
                 return Cookie::fromHeaderString($header, $raw);
@@ -158,6 +158,28 @@ class CookieStore implements Countable, IteratorAggregate
     }
 
     /**
+     * Dispatches all cookies in store.
+     *
+     * @deprecated Response should dispatch cookies.
+     */
+    public function dispatch(): void
+    {
+        foreach ($this->cookies as $cookie) {
+            $name    = $cookie->getPrefixedName();
+            $value   = $cookie->getValue();
+            $options = $cookie->getOptions();
+
+            if ($cookie->isRaw()) {
+                $this->setRawCookie($name, $value, $options);
+            } else {
+                $this->setCookie($name, $value, $options);
+            }
+        }
+
+        $this->clear();
+    }
+
+    /**
      * Returns all cookie instances in store.
      *
      * @return array<string, Cookie>
@@ -201,11 +223,35 @@ class CookieStore implements Countable, IteratorAggregate
     protected function validateCookies(array $cookies): void
     {
         foreach ($cookies as $index => $cookie) {
-            $type = get_debug_type($cookie);
+            $type = is_object($cookie) ? get_class($cookie) : gettype($cookie);
 
             if (! $cookie instanceof Cookie) {
                 throw CookieException::forInvalidCookieInstance([static::class, Cookie::class, $type, $index]);
             }
         }
+    }
+
+    /**
+     * Extracted call to `setrawcookie()` in order to run unit tests on it.
+     *
+     * @codeCoverageIgnore
+     *
+     * @deprecated
+     */
+    protected function setRawCookie(string $name, string $value, array $options): void
+    {
+        setrawcookie($name, $value, $options);
+    }
+
+    /**
+     * Extracted call to `setcookie()` in order to run unit tests on it.
+     *
+     * @codeCoverageIgnore
+     *
+     * @deprecated
+     */
+    protected function setCookie(string $name, string $value, array $options): void
+    {
+        setcookie($name, $value, $options);
     }
 }

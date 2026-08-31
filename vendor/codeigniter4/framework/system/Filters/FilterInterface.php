@@ -1,7 +1,5 @@
 <?php
 
-declare(strict_types=1);
-
 /**
  * This file is part of CodeIgniter 4 framework.
  *
@@ -33,7 +31,7 @@ interface FilterInterface
      *
      * @param list<string>|null $arguments
      *
-     * @return RequestInterface|ResponseInterface|string|null
+     * @return RequestInterface|ResponseInterface|string|void
      */
     public function before(RequestInterface $request, $arguments = null);
 
@@ -45,7 +43,7 @@ interface FilterInterface
      *
      * @param list<string>|null $arguments
      *
-     * @return ResponseInterface|null
+     * @return ResponseInterface|void
      */
     public function after(RequestInterface $request, ResponseInterface $response, $arguments = null);
 }

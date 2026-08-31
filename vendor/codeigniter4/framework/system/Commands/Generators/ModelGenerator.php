@@ -1,7 +1,5 @@
 <?php
 
-declare(strict_types=1);
-
 /**
  * This file is part of CodeIgniter 4 framework.
  *
@@ -85,7 +83,7 @@ class ModelGenerator extends BaseCommand
         $this->template  = 'model.tpl.php';
 
         $this->classNameLang = 'CLI.generator.className.model';
-        $this->generateClass($params);
+        $this->execute($params);
     }
 
     /**
@@ -114,23 +112,18 @@ class ModelGenerator extends BaseCommand
         }
 
         if ($return === 'entity') {
-            // Build the fully-qualified entity class from the model class so
-            // that the generated Entity keeps any sub-namespaces (eg. Admin).
-            $entityClass = str_replace('Models', 'Entities', $class);
+            $return = str_replace('Models', 'Entities', $class);
 
-            if (preg_match('/^(\S+)Model$/i', $entityClass, $match) === 1) {
-                $entityClass = $match[1];
+            if (preg_match('/^(\S+)Model$/i', $return, $match) === 1) {
+                $return = $match[1];
 
                 if ($this->getOption('suffix')) {
-                    $entityClass .= 'Entity';
+                    $return .= 'Entity';
                 }
             }
 
-            // Call the entity generator with the fully-qualified class name so
-            // it ends up under the correct sub-namespace/folder (eg. Admin).
-            $this->call('make:entity', array_merge([trim($entityClass, '\\')], $this->params));
-
-            $return = '\\' . trim($entityClass, '\\') . '::class';
+            $return = '\\' . trim($return, '\\') . '::class';
+            $this->call('make:entity', array_merge([$baseClass], $this->params));
         } else {
             $return = "'{$return}'";
         }

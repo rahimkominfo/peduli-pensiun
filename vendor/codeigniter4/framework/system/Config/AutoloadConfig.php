@@ -1,7 +1,5 @@
 <?php
 
-declare(strict_types=1);
-
 /**
  * This file is part of CodeIgniter 4 framework.
  *
@@ -14,7 +12,6 @@ declare(strict_types=1);
 namespace CodeIgniter\Config;
 
 use Laminas\Escaper\Escaper;
-use Laminas\Escaper\EscaperInterface;
 use Laminas\Escaper\Exception\ExceptionInterface;
 use Laminas\Escaper\Exception\InvalidArgumentException as EscaperInvalidArgumentException;
 use Laminas\Escaper\Exception\RuntimeException;
@@ -93,7 +90,7 @@ class AutoloadConfig
      */
     protected $corePsr4 = [
         'CodeIgniter' => SYSTEMPATH,
-        'Config'      => APPPATH . 'Config',
+        'App'         => APPPATH, // To ensure filters, etc still found,
     ];
 
     /**
@@ -106,7 +103,7 @@ class AutoloadConfig
      * searched for within one or more directories as they would if they
      * were being autoloaded through a namespace.
      *
-     * @var array<class-string, string>
+     * @var array<string, string>
      */
     protected $coreClassmap = [
         AbstractLogger::class                  => SYSTEMPATH . 'ThirdParty/PSR/Log/AbstractLogger.php',
@@ -120,7 +117,6 @@ class AutoloadConfig
         ExceptionInterface::class              => SYSTEMPATH . 'ThirdParty/Escaper/Exception/ExceptionInterface.php',
         EscaperInvalidArgumentException::class => SYSTEMPATH . 'ThirdParty/Escaper/Exception/InvalidArgumentException.php',
         RuntimeException::class                => SYSTEMPATH . 'ThirdParty/Escaper/Exception/RuntimeException.php',
-        EscaperInterface::class                => SYSTEMPATH . 'ThirdParty/Escaper/EscaperInterface.php',
         Escaper::class                         => SYSTEMPATH . 'ThirdParty/Escaper/Escaper.php',
     ];
 
@@ -142,8 +138,7 @@ class AutoloadConfig
      */
     public function __construct()
     {
-        // @phpstan-ignore codeigniter.superglobalsOffsetAccess (service() is not yet available)
-        if (($_SERVER['CI_ENVIRONMENT'] ?? null) === 'testing') {
+        if (isset($_SERVER['CI_ENVIRONMENT']) && $_SERVER['CI_ENVIRONMENT'] === 'testing') {
             $this->psr4['Tests\Support']                  = SUPPORTPATH;
             $this->classmap['CodeIgniter\Log\TestLogger'] = SYSTEMPATH . 'Test/TestLogger.php';
             $this->classmap['CIDatabaseTestCase']         = SYSTEMPATH . 'Test/CIDatabaseTestCase.php';

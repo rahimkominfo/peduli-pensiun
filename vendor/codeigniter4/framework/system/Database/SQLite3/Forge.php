@@ -1,7 +1,5 @@
 <?php
 
-declare(strict_types=1);
-
 /**
  * This file is part of CodeIgniter 4 framework.
  *
@@ -101,7 +99,7 @@ class Forge extends BaseForge
         }
 
         if (! empty($this->db->dataCache['db_names'])) {
-            $key = array_search(strtolower($dbName), array_map(strtolower(...), $this->db->dataCache['db_names']), true);
+            $key = array_search(strtolower($dbName), array_map('strtolower', $this->db->dataCache['db_names']), true);
             if ($key !== false) {
                 unset($this->db->dataCache['db_names'][$key]);
             }
@@ -111,39 +109,27 @@ class Forge extends BaseForge
     }
 
     /**
-     * @param list<string>|string $columnNames
-     *
-     * @throws DatabaseException
-     */
-    public function dropColumn(string $table, $columnNames): bool
-    {
-        $columns = is_array($columnNames) ? $columnNames : array_map(trim(...), explode(',', $columnNames));
-        $result  = (new Table($this->db, $this))
-            ->fromTable($this->db->DBPrefix . $table)
-            ->dropColumn($columns)
-            ->run();
-
-        if (! $result && $this->db->DBDebug) {
-            throw new DatabaseException(sprintf(
-                'Failed to drop column%s "%s" on "%s" table.',
-                count($columns) > 1 ? 's' : '',
-                implode('", "', $columns),
-                $table,
-            ));
-        }
-
-        return $result;
-    }
-
-    /**
      * @param array|string $processedFields Processed column definitions
      *                                      or column names to DROP
      *
-     * @return ($alterType is 'DROP' ? string : list<string>|null)
+     * @return         array|string|null
+     * @return         list<string>|string|null                            SQL string or null
+     * @phpstan-return ($alterType is 'DROP' ? string : list<string>|null)
      */
     protected function _alterTable(string $alterType, string $table, $processedFields)
     {
         switch ($alterType) {
+            case 'DROP':
+                $columnNamesToDrop = $processedFields;
+
+                $sqlTable = new Table($this->db, $this);
+
+                $sqlTable->fromTable($table)
+                    ->dropColumn($columnNamesToDrop)
+                    ->run();
+
+                return ''; // Why empty string?
+
             case 'CHANGE':
                 $fieldsToModify = [];
 
@@ -181,7 +167,7 @@ class Forge extends BaseForge
      */
     protected function _processColumn(array $processedField): string
     {
-        if ($processedField['type'] === 'TEXT' && str_starts_with($processedField['length'], "('")) {
+        if ($processedField['type'] === 'TEXT' && strpos($processedField['length'], "('") === 0) {
             $processedField['type'] .= ' CHECK(' . $this->db->escapeIdentifiers($processedField['name'])
                 . ' IN ' . $processedField['length'] . ')';
         }
@@ -224,7 +210,7 @@ class Forge extends BaseForge
         if (
             ! empty($attributes['AUTO_INCREMENT'])
             && $attributes['AUTO_INCREMENT'] === true
-            && str_contains(strtolower($field['type']), 'int')
+            && stripos($field['type'], 'int') !== false
         ) {
             $field['type']           = 'INTEGER PRIMARY KEY';
             $field['default']        = '';

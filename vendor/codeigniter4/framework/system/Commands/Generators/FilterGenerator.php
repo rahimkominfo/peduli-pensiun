@@ -1,7 +1,5 @@
 <?php
 
-declare(strict_types=1);
-
 /**
  * This file is part of CodeIgniter 4 framework.
  *
@@ -81,6 +79,6 @@ class FilterGenerator extends BaseCommand
         $this->template  = 'filter.tpl.php';
 
         $this->classNameLang = 'CLI.generator.className.filter';
-        $this->generateClass($params);
+        $this->execute($params);
     }
 }

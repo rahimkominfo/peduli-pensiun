@@ -1,7 +1,5 @@
 <?php
 
-declare(strict_types=1);
-
 /**
  * This file is part of CodeIgniter 4 framework.
  *
@@ -13,11 +11,11 @@ declare(strict_types=1);
 
 namespace CodeIgniter\Test;
 
-use CodeIgniter\Exceptions\BadMethodCallException;
-use CodeIgniter\Exceptions\InvalidArgumentException;
+use BadMethodCallException;
 use DOMDocument;
 use DOMNodeList;
 use DOMXPath;
+use InvalidArgumentException;
 
 /**
  * Load a response into a DOMDocument for testing assertions based on that
@@ -112,7 +110,7 @@ class DOMParser
         if ($element === null) {
             $content = $this->dom->saveHTML($this->dom->documentElement);
 
-            return str_contains($content, $search);
+            return mb_strpos($content, $search) !== false;
         }
 
         $result = $this->doXPath($search, $element);
@@ -178,24 +176,6 @@ class DOMParser
     }
 
     /**
-     * Checks to see if the XPath can be found.
-     */
-    public function seeXPath(string $path): bool
-    {
-        $xpath = new DOMXPath($this->dom);
-
-        return (bool) $xpath->query($path)->length;
-    }
-
-    /**
-     * Checks to see if the XPath can't be found.
-     */
-    public function dontSeeXPath(string $path): bool
-    {
-        return ! $this->seeXPath($path);
-    }
-
-    /**
      * Search the DOM using an XPath expression.
      *
      * @return DOMNodeList|false
@@ -233,8 +213,10 @@ class DOMParser
 
         // $paths might contain a number of different
         // ready to go xpath portions to tack on.
-        foreach ($paths as $extra) {
-            $path .= $extra;
+        if ($paths !== [] && is_array($paths)) {
+            foreach ($paths as $extra) {
+                $path .= $extra;
+            }
         }
 
         if ($search !== null) {
@@ -258,11 +240,11 @@ class DOMParser
         $attr  = null;
 
         // ID?
-        if (str_contains($selector, '#')) {
+        if (strpos($selector, '#') !== false) {
             [$tag, $id] = explode('#', $selector);
         }
         // Attribute
-        elseif (str_contains($selector, '[') && str_contains($selector, ']')) {
+        elseif (strpos($selector, '[') !== false && strpos($selector, ']') !== false) {
             $open  = strpos($selector, '[');
             $close = strpos($selector, ']');
 
@@ -280,7 +262,7 @@ class DOMParser
             $attr  = [$name => trim($value, '] ')];
         }
         // Class?
-        elseif (str_contains($selector, '.')) {
+        elseif (strpos($selector, '.') !== false) {
             [$tag, $class] = explode('.', $selector);
         }
         // Otherwise, assume the entire string is our tag

@@ -1,7 +1,5 @@
 <?php
 
-declare(strict_types=1);
-
 /**
  * This file is part of CodeIgniter 4 framework.
  *
@@ -26,14 +24,14 @@ class Image extends File
     /**
      * The original image width in pixels.
      *
-     * @var int
+     * @var float|int
      */
     public $origWidth;
 
     /**
      * The original image height in pixels.
      *
-     * @var int
+     * @var float|int
      */
     public $origHeight;
 
@@ -102,9 +100,8 @@ class Image extends File
     public function getProperties(bool $return = false)
     {
         $path = $this->getPathname();
-        $vals = getimagesize($path);
 
-        if ($vals === false) {
+        if (! $vals = getimagesize($path)) {
             throw ImageException::forFileNotSupported();
         }
 
@@ -117,7 +114,7 @@ class Image extends File
 
         $mime = 'image/' . ($types[$vals[2]] ?? 'jpg');
 
-        if ($return) {
+        if ($return === true) {
             return [
                 'width'      => $vals[0],
                 'height'     => $vals[1],

@@ -1,7 +1,5 @@
 <?php
 
-declare(strict_types=1);
-
 /**
  * This file is part of CodeIgniter 4 framework.
  *
@@ -15,44 +13,42 @@ namespace CodeIgniter\Session\Handlers;
 
 use CodeIgniter\I18n\Time;
 use CodeIgniter\Session\Exceptions\SessionException;
-use CodeIgniter\Session\PersistsConnection;
 use Config\Session as SessionConfig;
 use Redis;
 use RedisException;
+use ReturnTypeWillChange;
 
 /**
- * Session handler using Redis for persistence.
+ * Session handler using Redis for persistence
  */
 class RedisHandler extends BaseHandler
 {
-    use PersistsConnection;
-
     private const DEFAULT_PORT     = 6379;
     private const DEFAULT_PROTOCOL = 'tcp';
 
     /**
-     * phpRedis instance.
+     * phpRedis instance
      *
      * @var Redis|null
      */
     protected $redis;
 
     /**
-     * Key prefix.
+     * Key prefix
      *
      * @var string
      */
     protected $keyPrefix = 'ci_session:';
 
     /**
-     * Lock key.
+     * Lock key
      *
      * @var string|null
      */
     protected $lockKey;
 
     /**
-     * Key exists flag.
+     * Key exists flag
      *
      * @var bool
      */
@@ -66,17 +62,7 @@ class RedisHandler extends BaseHandler
     protected $sessionExpiration = 7200;
 
     /**
-     * Time (microseconds) to wait if lock cannot be acquired.
-     */
-    private int $lockRetryInterval = 100_000;
-
-    /**
-     * Maximum number of lock acquisition attempts.
-     */
-    private int $lockMaxRetries = 300;
-
-    /**
-     * @param string $ipAddress User's IP address.
+     * @param string $ipAddress User's IP address
      *
      * @throws SessionException
      */
@@ -84,12 +70,11 @@ class RedisHandler extends BaseHandler
     {
         parent::__construct($config, $ipAddress);
 
-        // Store Session configurations.
+        // Store Session configurations
         $this->sessionExpiration = ($config->expiration === 0)
             ? (int) ini_get('session.gc_maxlifetime')
             : $config->expiration;
-
-        // Add session cookie name for multiple session cookies.
+        // Add sessionCookieName for multiple session cookies.
         $this->keyPrefix .= $config->cookieName . ':';
 
         $this->setSavePath();
@@ -97,78 +82,39 @@ class RedisHandler extends BaseHandler
         if ($this->matchIP === true) {
             $this->keyPrefix .= $this->ipAddress . ':';
         }
-
-        $this->lockRetryInterval = $config->lockRetryInterval ?? $this->lockRetryInterval; // @phpstan-ignore nullCoalesce.property
-        $this->lockMaxRetries    = $config->lockMaxRetries ?? $this->lockMaxRetries; // @phpstan-ignore nullCoalesce.property
     }
 
     protected function setSavePath(): void
     {
-        if ($this->savePath === '') {
+        if (empty($this->savePath)) {
             throw SessionException::forEmptySavepath();
         }
 
-        $url   = parse_url($this->savePath);
-        $query = [];
-
-        if ($url === false) {
-            // Unix domain socket like `unix:///var/run/redis/redis.sock?persistent=1`.
-            if (preg_match('#unix://(/[^:?]+)(\?.+)?#', $this->savePath, $matches)) {
-                $host = $matches[1];
-                $port = 0;
-
-                if (isset($matches[2])) {
-                    parse_str(ltrim($matches[2], '?'), $query);
-                }
-            } else {
-                throw SessionException::forInvalidSavePathFormat($this->savePath);
+        if (preg_match('#(?:(tcp|tls)://)?([^:?]+)(?:\:(\d+))?(\?.+)?#', $this->savePath, $matches)) {
+            if (! isset($matches[4])) {
+                $matches[4] = ''; // Just to avoid undefined index notices below
             }
+
+            $this->savePath = [
+                'protocol' => ! empty($matches[1]) ? $matches[1] : self::DEFAULT_PROTOCOL,
+                'host'     => $matches[2],
+                'port'     => empty($matches[3]) ? self::DEFAULT_PORT : $matches[3],
+                'password' => preg_match('#auth=([^\s&]+)#', $matches[4], $match) ? $match[1] : null,
+                'database' => preg_match('#database=(\d+)#', $matches[4], $match) ? (int) $match[1] : 0,
+                'timeout'  => preg_match('#timeout=(\d+\.\d+|\d+)#', $matches[4], $match) ? (float) $match[1] : 0.0,
+            ];
+
+            preg_match('#prefix=([^\s&]+)#', $matches[4], $match) && $this->keyPrefix = $match[1];
         } else {
-            // Also accepts `/var/run/redis.sock` for backward compatibility.
-            if (isset($url['path']) && $url['path'][0] === '/') {
-                $host = $url['path'];
-                $port = 0;
-            } else {
-                // TCP connection.
-                if (! isset($url['host'])) {
-                    throw SessionException::forInvalidSavePathFormat($this->savePath);
-                }
-
-                $protocol = $url['scheme'] ?? self::DEFAULT_PROTOCOL;
-                $host     = $protocol . '://' . $url['host'];
-                $port     = $url['port'] ?? self::DEFAULT_PORT;
-            }
-
-            if (isset($url['query'])) {
-                parse_str($url['query'], $query);
-            }
-        }
-
-        $persistent = isset($query['persistent']) ? filter_var($query['persistent'], FILTER_VALIDATE_BOOL) : null;
-        $password   = $query['auth'] ?? null;
-        $database   = isset($query['database']) ? (int) $query['database'] : 0;
-        $timeout    = isset($query['timeout']) ? (float) $query['timeout'] : 0.0;
-        $prefix     = $query['prefix'] ?? null;
-
-        $this->savePath = [
-            'host'       => $host,
-            'port'       => $port,
-            'password'   => $password,
-            'database'   => $database,
-            'timeout'    => $timeout,
-            'persistent' => $persistent,
-        ];
-
-        if ($prefix !== null) {
-            $this->keyPrefix = $prefix;
+            throw SessionException::forInvalidSavePathFormat($this->savePath);
         }
     }
 
     /**
      * Re-initialize existing session, or creates a new one.
      *
-     * @param string $path The path where to store/retrieve the session.
-     * @param string $name The session name.
+     * @param string $path The path where to store/retrieve the session
+     * @param string $name The session name
      *
      * @throws RedisException
      */
@@ -178,38 +124,23 @@ class RedisHandler extends BaseHandler
             return false;
         }
 
-        if ($this->hasPersistentConnection()) {
-            $redis = $this->getPersistentConnection();
-
-            try {
-                $pingReply = $redis->ping();
-
-                if (in_array($pingReply, [true, '+PONG'], true)) {
-                    $this->redis = $redis;
-
-                    return true;
-                }
-            } catch (RedisException) {
-                $this->setPersistentConnection(null);
-            }
-        }
-
         $redis = new Redis();
 
-        $funcConnection = isset($this->savePath['persistent']) && $this->savePath['persistent'] === true
-            ? 'pconnect'
-            : 'connect';
-
-        if ($redis->{$funcConnection}($this->savePath['host'], $this->savePath['port'], $this->savePath['timeout']) === false) {
+        if (
+            ! $redis->connect(
+                $this->savePath['protocol'] . '://' . $this->savePath['host'],
+                ($this->savePath['host'][0] === '/' ? 0 : $this->savePath['port']),
+                $this->savePath['timeout']
+            )
+        ) {
             $this->logger->error('Session: Unable to connect to Redis with the configured settings.');
         } elseif (isset($this->savePath['password']) && ! $redis->auth($this->savePath['password'])) {
             $this->logger->error('Session: Unable to authenticate to Redis instance.');
         } elseif (isset($this->savePath['database']) && ! $redis->select($this->savePath['database'])) {
             $this->logger->error(
-                'Session: Unable to select Redis database with index ' . $this->savePath['database'],
+                'Session: Unable to select Redis database with index ' . $this->savePath['database']
             );
         } else {
-            $this->setPersistentConnection($redis);
             $this->redis = $redis;
 
             return true;
@@ -221,11 +152,15 @@ class RedisHandler extends BaseHandler
     /**
      * Reads the session data from the session storage, and returns the results.
      *
-     * @param string $id The session ID.
+     * @param string $id The session ID
+     *
+     * @return false|string Returns an encoded string of the read data.
+     *                      If nothing was read, it must return false.
      *
      * @throws RedisException
      */
-    public function read($id): false|string
+    #[ReturnTypeWillChange]
+    public function read($id)
     {
         if (isset($this->redis) && $this->lockSession($id)) {
             if (! isset($this->sessionID)) {
@@ -251,8 +186,8 @@ class RedisHandler extends BaseHandler
     /**
      * Writes the session data to the session storage.
      *
-     * @param string $id   The session ID.
-     * @param string $data The encoded session data.
+     * @param string $id   The session ID
+     * @param string $data The encoded session data
      *
      * @throws RedisException
      */
@@ -300,12 +235,20 @@ class RedisHandler extends BaseHandler
             try {
                 $pingReply = $this->redis->ping();
 
-                if (in_array($pingReply, [true, '+PONG'], true) && isset($this->lockKey) && ! $this->releaseLock()) {
-                    return false;
+                if (($pingReply === true) || ($pingReply === '+PONG')) {
+                    if (isset($this->lockKey) && ! $this->releaseLock()) {
+                        return false;
+                    }
+
+                    if (! $this->redis->close()) {
+                        return false;
+                    }
                 }
             } catch (RedisException $e) {
                 $this->logger->error('Session: Got RedisException on close(): ' . $e->getMessage());
             }
+
+            $this->redis = null;
 
             return true;
         }
@@ -314,9 +257,9 @@ class RedisHandler extends BaseHandler
     }
 
     /**
-     * Destroys a session.
+     * Destroys a session
      *
-     * @param string $id The session ID being destroyed.
+     * @param string $id The session ID being destroyed
      *
      * @throws RedisException
      */
@@ -325,7 +268,7 @@ class RedisHandler extends BaseHandler
         if (isset($this->redis, $this->lockKey)) {
             if (($result = $this->redis->del($this->keyPrefix . $id)) !== 1) {
                 $this->logger->debug(
-                    'Session: Redis::del() expected to return 1, got ' . var_export($result, true) . ' instead.',
+                    'Session: Redis::del() expected to return 1, got ' . var_export($result, true) . ' instead.'
                 );
             }
 
@@ -340,8 +283,11 @@ class RedisHandler extends BaseHandler
      *
      * @param int $max_lifetime Sessions that have not updated
      *                          for the last max_lifetime seconds will be removed.
+     *
+     * @return false|int Returns the number of deleted sessions on success, or false on failure.
      */
-    public function gc($max_lifetime): int
+    #[ReturnTypeWillChange]
+    public function gc($max_lifetime)
     {
         return 1;
     }
@@ -349,7 +295,7 @@ class RedisHandler extends BaseHandler
     /**
      * Acquires an emulated lock.
      *
-     * @param string $sessionID Session ID.
+     * @param string $sessionID Session ID
      *
      * @throws RedisException
      */
@@ -373,23 +319,23 @@ class RedisHandler extends BaseHandler
                 (string) Time::now()->getTimestamp(),
                 // NX -- Only set the key if it does not already exist.
                 // EX seconds -- Set the specified expire time, in seconds.
-                ['nx', 'ex' => 300],
+                ['nx', 'ex' => 300]
             );
 
             if (! $result) {
-                usleep($this->lockRetryInterval);
+                usleep(100000);
 
                 continue;
             }
 
             $this->lockKey = $lockKey;
             break;
-        } while (++$attempt < $this->lockMaxRetries);
+        } while (++$attempt < 300);
 
-        if ($attempt === $this->lockMaxRetries) {
+        if ($attempt === 300) {
             $this->logger->error(
                 'Session: Unable to obtain lock for ' . $this->keyPrefix . $sessionID
-                . ' after ' . $this->lockMaxRetries . ' attempts, aborting.',
+                . ' after 300 attempts, aborting.'
             );
 
             return false;
@@ -401,7 +347,7 @@ class RedisHandler extends BaseHandler
     }
 
     /**
-     * Releases a previously acquired lock.
+     * Releases a previously acquired lock
      *
      * @throws RedisException
      */

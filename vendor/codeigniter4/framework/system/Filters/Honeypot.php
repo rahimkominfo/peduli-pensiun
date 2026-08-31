@@ -1,7 +1,5 @@
 <?php
 
-declare(strict_types=1);
-
 /**
  * This file is part of CodeIgniter 4 framework.
  *
@@ -17,6 +15,7 @@ use CodeIgniter\Honeypot\Exceptions\HoneypotException;
 use CodeIgniter\HTTP\IncomingRequest;
 use CodeIgniter\HTTP\RequestInterface;
 use CodeIgniter\HTTP\ResponseInterface;
+use Config\Services;
 
 /**
  * Honeypot filter
@@ -36,14 +35,12 @@ class Honeypot implements FilterInterface
     public function before(RequestInterface $request, $arguments = null)
     {
         if (! $request instanceof IncomingRequest) {
-            return null;
+            return;
         }
 
-        if (service('honeypot')->hasContent($request)) {
+        if (Services::honeypot()->hasContent($request)) {
             throw HoneypotException::isBot();
         }
-
-        return null;
     }
 
     /**
@@ -53,8 +50,6 @@ class Honeypot implements FilterInterface
      */
     public function after(RequestInterface $request, ResponseInterface $response, $arguments = null)
     {
-        service('honeypot')->attachHoneypot($response);
-
-        return null;
+        Services::honeypot()->attachHoneypot($response);
     }
 }

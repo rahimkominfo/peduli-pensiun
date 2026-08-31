@@ -1,7 +1,5 @@
 <?php
 
-declare(strict_types=1);
-
 /**
  * This file is part of CodeIgniter 4 framework.
  *
@@ -27,21 +25,21 @@ class Table
     /**
      * Data for table rows
      *
-     * @var list<array<string, string>>|list<list<array<string, string>>>
+     * @var list<array>|list<list<array>>
      */
     public $rows = [];
 
     /**
      * Data for table heading
      *
-     * @var array<int, mixed>
+     * @var array
      */
     public $heading = [];
 
     /**
      * Data for table footing
      *
-     * @var array<int, mixed>
+     * @var array
      */
     public $footing = [];
 
@@ -62,7 +60,7 @@ class Table
     /**
      * Table layout template
      *
-     * @var array<string, string>
+     * @var array
      */
     public $template;
 
@@ -83,7 +81,7 @@ class Table
     /**
      * Callback for custom table layout
      *
-     * @var (callable(mixed): mixed)|null
+     * @var callable|null
      */
     public $function;
 
@@ -95,7 +93,7 @@ class Table
     /**
      * Set the template from the table config file if it exists
      *
-     * @param array<string, string> $config (default: array())
+     * @param array $config (default: array())
      */
     public function __construct($config = [])
     {
@@ -108,7 +106,7 @@ class Table
     /**
      * Set the template
      *
-     * @param array<string, string>|string $template
+     * @param array $template
      *
      * @return bool
      */
@@ -157,10 +155,10 @@ class Table
      * columns. This allows a single array with many elements to be
      * displayed in a table that has a fixed column count.
      *
-     * @param list<string> $array
-     * @param int          $columnLimit
+     * @param array $array
+     * @param int   $columnLimit
      *
-     * @return array<int, mixed>|false
+     * @return array|false
      */
     public function makeColumns($array = [], $columnLimit = 0)
     {
@@ -227,13 +225,13 @@ class Table
             $missingKeys = array_diff_key($keyIndex, $tmpRow);
 
             // Remove all keys which don't exist in $keyIndex
-            $tmpRow = array_filter($tmpRow, static fn ($k): bool => array_key_exists($k, $keyIndex), ARRAY_FILTER_USE_KEY);
+            $tmpRow = array_filter($tmpRow, static fn ($k) => array_key_exists($k, $keyIndex), ARRAY_FILTER_USE_KEY);
 
             // add missing keys to row, but use $this->emptyCells
-            $tmpRow = array_merge($tmpRow, array_map(fn ($v): array => ['data' => $this->emptyCells], $missingKeys));
+            $tmpRow = array_merge($tmpRow, array_map(fn ($v) => ['data' => $this->emptyCells], $missingKeys));
 
             // order keys by $keyIndex values
-            uksort($tmpRow, static fn ($k1, $k2): int => $keyIndex[$k1] <=> $keyIndex[$k2]);
+            uksort($tmpRow, static fn ($k1, $k2) => $keyIndex[$k1] <=> $keyIndex[$k2]);
         }
         $this->rows[] = $tmpRow;
 
@@ -260,9 +258,7 @@ class Table
      *
      * Ensures a standard associative array format for all cell data
      *
-     * @param array<int, mixed> $args
-     *
-     * @return array<string, array<string, mixed>>|list<array<string, mixed>>
+     * @return array<string, array>|list<array>
      */
     protected function _prepArgs(array $args)
     {
@@ -299,7 +295,7 @@ class Table
     /**
      * Generate the table
      *
-     * @param array<int, mixed>|BaseResult|null $tableData
+     * @param array|BaseResult|null $tableData
      *
      * @return string
      */
@@ -332,7 +328,7 @@ class Table
         $out = $this->template['table_open'] . $this->newline;
 
         // Add any caption here
-        if (isset($this->caption) && $this->caption !== '') {
+        if ($this->caption) {
             $out .= '<caption>' . $this->caption . '</caption>' . $this->newline;
         }
 
@@ -474,7 +470,7 @@ class Table
     /**
      * Set table data from an array
      *
-     * @param array<int, mixed> $data
+     * @param array $data
      *
      * @return void
      */
@@ -512,7 +508,7 @@ class Table
     /**
      * Default Template
      *
-     * @return array<string, string>
+     * @return array
      */
     protected function _defaultTemplate()
     {

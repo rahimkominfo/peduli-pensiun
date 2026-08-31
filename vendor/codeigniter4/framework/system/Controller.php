@@ -1,7 +1,5 @@
 <?php
 
-declare(strict_types=1);
-
 /**
  * This file is part of CodeIgniter 4 framework.
  *
@@ -15,16 +13,18 @@ namespace CodeIgniter;
 
 use CodeIgniter\HTTP\CLIRequest;
 use CodeIgniter\HTTP\Exceptions\HTTPException;
-use CodeIgniter\HTTP\Exceptions\RedirectException;
 use CodeIgniter\HTTP\IncomingRequest;
 use CodeIgniter\HTTP\RequestInterface;
 use CodeIgniter\HTTP\ResponseInterface;
 use CodeIgniter\Validation\Exceptions\ValidationException;
 use CodeIgniter\Validation\ValidationInterface;
+use Config\Services;
 use Config\Validation;
 use Psr\Log\LoggerInterface;
 
 /**
+ * Class Controller
+ *
  * @see \CodeIgniter\ControllerTest
  */
 class Controller
@@ -76,7 +76,7 @@ class Controller
      *
      * @return void
      *
-     * @throws HTTPException|RedirectException
+     * @throws HTTPException
      */
     public function initController(RequestInterface $request, ResponseInterface $response, LoggerInterface $logger)
     {
@@ -104,7 +104,7 @@ class Controller
      *
      * @return void
      *
-     * @throws HTTPException|RedirectException
+     * @throws HTTPException
      */
     protected function forceHTTPS(int $duration = 31_536_000)
     {
@@ -120,7 +120,25 @@ class Controller
      */
     protected function cachePage(int $time)
     {
-        service('responsecache')->setTtl($time);
+        Services::responsecache()->setTtl($time);
+    }
+
+    /**
+     * Handles "auto-loading" helper files.
+     *
+     * @deprecated Use `helper` function instead of using this method.
+     *
+     * @codeCoverageIgnore
+     *
+     * @return void
+     */
+    protected function loadHelpers()
+    {
+        if ($this->helpers === []) {
+            return;
+        }
+
+        helper($this->helpers);
     }
 
     /**
@@ -156,7 +174,7 @@ class Controller
      */
     private function setValidator($rules, array $messages): void
     {
-        $this->validator = service('validation');
+        $this->validator = Services::validation();
 
         // If you replace the $rules array with the name of the group
         if (is_string($rules)) {

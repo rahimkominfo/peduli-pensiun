@@ -1,7 +1,5 @@
 <?php
 
-declare(strict_types=1);
-
 /**
  * This file is part of CodeIgniter 4 framework.
  *
@@ -14,6 +12,7 @@ declare(strict_types=1);
 namespace CodeIgniter\Events;
 
 use Config\Modules;
+use Config\Services;
 
 /**
  * Events
@@ -29,7 +28,7 @@ class Events
     /**
      * The list of listeners.
      *
-     * @var array<string, array{0: bool, 1: list<int>, 2: list<callable(mixed): mixed>}>
+     * @var array
      */
     protected static $listeners = [];
 
@@ -53,7 +52,7 @@ class Events
      * Stores information about the events
      * for display in the debug toolbar.
      *
-     * @var list<array{start: float, end: float, event: string}>
+     * @var list<array<string, float|string>>
      */
     protected static $performanceLog = [];
 
@@ -76,20 +75,23 @@ class Events
             return;
         }
 
-        $config = new Modules();
+        $config = config(Modules::class);
         $events = APPPATH . 'Config' . DIRECTORY_SEPARATOR . 'Events.php';
         $files  = [];
 
         if ($config->shouldDiscover('events')) {
-            $files = service('locator')->search('Config/Events.php');
+            $files = Services::locator()->search('Config/Events.php');
         }
 
-        $files = array_filter(array_map(
-            realpath(...),
-            $files,
-        ));
+        $files = array_filter(array_map(static function (string $file) {
+            if (is_file($file)) {
+                return realpath($file) ?: $file;
+            }
 
-        static::$files = array_values(array_unique(array_merge($files, [$events])));
+            return false; // @codeCoverageIgnore
+        }, $files));
+
+        static::$files = array_unique(array_merge($files, [$events]));
 
         foreach (static::$files as $file) {
             include $file;
@@ -107,9 +109,9 @@ class Events
      *  Events::on('create', [$myInstance, 'myMethod']);  // Method on an existing instance
      *  Events::on('create', function() {});              // Closure
      *
-     * @param string                 $eventName
-     * @param callable(mixed): mixed $callback
-     * @param int                    $priority
+     * @param string   $eventName
+     * @param callable $callback
+     * @param int      $priority
      *
      * @return void
      */
@@ -135,7 +137,7 @@ class Events
      *  b) a method returns false, at which point execution of subscribers stops.
      *
      * @param string $eventName
-     * @param mixed  ...$arguments
+     * @param mixed  $arguments
      */
     public static function trigger($eventName, ...$arguments): bool
     {
@@ -155,7 +157,7 @@ class Events
                 static::$performanceLog[] = [
                     'start' => $start,
                     'end'   => microtime(true),
-                    'event' => $eventName,
+                    'event' => strtolower($eventName),
                 ];
             }
 
@@ -172,8 +174,6 @@ class Events
      * sorted by priority.
      *
      * @param string $eventName
-     *
-     * @return list<callable(mixed): mixed>
      */
     public static function listeners($eventName): array
     {
@@ -199,8 +199,7 @@ class Events
      * If the listener couldn't be found, returns FALSE, else TRUE if
      * it was removed.
      *
-     * @param string                 $eventName
-     * @param callable(mixed): mixed $listener
+     * @param string $eventName
      */
     public static function removeListener($eventName, callable $listener): bool
     {
@@ -212,7 +211,7 @@ class Events
             if ($check === $listener) {
                 unset(
                     static::$listeners[$eventName][1][$index],
-                    static::$listeners[$eventName][2][$index],
+                    static::$listeners[$eventName][2][$index]
                 );
 
                 return true;
@@ -243,8 +242,6 @@ class Events
 
     /**
      * Sets the path to the file that routes are read from.
-     *
-     * @param list<string> $files
      *
      * @return void
      */
@@ -278,29 +275,10 @@ class Events
     /**
      * Getter for the performance log records.
      *
-     * @return list<array{start: float, end: float, event: string}>
+     * @return list<array<string, float|string>>
      */
     public static function getPerformanceLogs()
     {
         return static::$performanceLog;
-    }
-
-    /**
-     * Cleanup performance log and request-specific listeners for worker mode.
-     *
-     * Called at the END of each request to clean up state.
-     *
-     * @param list<string> $resetEventListeners Additional event names to reset.
-     */
-    public static function cleanupForWorkerMode(array $resetEventListeners = []): void
-    {
-        if (CI_DEBUG) {
-            static::$performanceLog = [];
-            static::removeAllListeners('DBQuery');
-        }
-
-        foreach ($resetEventListeners as $event) {
-            static::removeAllListeners($event);
-        }
     }
 }

@@ -1,7 +1,5 @@
 <?php
 
-declare(strict_types=1);
-
 /**
  * This file is part of CodeIgniter 4 framework.
  *
@@ -49,8 +47,12 @@ class CacheFactory
      */
     public static function getHandler(Cache $config, ?string $handler = null, ?string $backup = null)
     {
-        if ($config->validHandlers === []) {
+        if (! isset($config->validHandlers) || $config->validHandlers === []) {
             throw CacheException::forInvalidHandlers();
+        }
+
+        if (! isset($config->handler) || ! isset($config->backupHandler)) {
+            throw CacheException::forNoBackup();
         }
 
         $handler ??= $config->handler;
@@ -71,7 +73,7 @@ class CacheFactory
             }
         }
 
-        // If $adapter->initialize() throws a CriticalError exception, we will attempt to
+        // If $adapter->initialization throws a CriticalError exception, we will attempt to
         // use the $backup handler, if that also fails, we resort to the dummy handler.
         try {
             $adapter->initialize();

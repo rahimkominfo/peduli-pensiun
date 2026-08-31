@@ -1,7 +1,5 @@
 <?php
 
-declare(strict_types=1);
-
 /**
  * This file is part of CodeIgniter 4 framework.
  *
@@ -13,19 +11,23 @@ declare(strict_types=1);
 
 namespace CodeIgniter;
 
+use BadMethodCallException;
 use Closure;
 use CodeIgniter\Database\BaseBuilder;
 use CodeIgniter\Database\BaseConnection;
+use CodeIgniter\Database\BaseResult;
 use CodeIgniter\Database\ConnectionInterface;
 use CodeIgniter\Database\Exceptions\DatabaseException;
 use CodeIgniter\Database\Exceptions\DataException;
+use CodeIgniter\Database\Query;
 use CodeIgniter\Entity\Entity;
-use CodeIgniter\Exceptions\BadMethodCallException;
-use CodeIgniter\Exceptions\InvalidArgumentException;
 use CodeIgniter\Exceptions\ModelException;
+use CodeIgniter\I18n\Time;
 use CodeIgniter\Validation\ValidationInterface;
 use Config\Database;
-use Config\Feature;
+use ReflectionClass;
+use ReflectionException;
+use ReflectionProperty;
 use stdClass;
 
 /**
@@ -38,7 +40,7 @@ use stdClass;
  *      - allow intermingling calls to the builder
  *      - removes the need to use Result object directly in most cases
  *
- * @property-read BaseConnection $db
+ * @property BaseConnection $db
  *
  * @method $this groupBy($by, ?bool $escape = null)
  * @method $this groupEnd()
@@ -84,14 +86,12 @@ use stdClass;
  * @method $this whereIn(?string $key = null, $values = null, ?bool $escape = null)
  * @method $this whereNotIn(?string $key = null, $values = null, ?bool $escape = null)
  *
- * @phpstan-method $this when($condition, callable(BaseBuilder, mixed): mixed $callback, (callable(BaseBuilder): mixed)|null $defaultCallback = null)
- * @phpstan-method $this whenNot($condition, callable(BaseBuilder, mixed): mixed $callback, (callable(BaseBuilder): mixed)|null $defaultCallback = null)
  * @phpstan-import-type row_array from BaseModel
  */
 class Model extends BaseModel
 {
     /**
-     * Name of database table.
+     * Name of database table
      *
      * @var string
      */
@@ -112,7 +112,7 @@ class Model extends BaseModel
     protected $useAutoIncrement = true;
 
     /**
-     * Query Builder object.
+     * Query Builder object
      *
      * @var BaseBuilder|null
      */
@@ -123,7 +123,7 @@ class Model extends BaseModel
      * so that we can capture it (not the builder)
      * and ensure it gets validated first.
      *
-     * @var array{escape: array<int|string, bool|null>, data: row_array}|array{}
+     * @var array
      */
     protected $tempData = [];
 
@@ -131,14 +131,14 @@ class Model extends BaseModel
      * Escape array that maps usage of escape
      * flag for every parameter.
      *
-     * @var array<int|string, bool|null>
+     * @var array
      */
     protected $escape = [];
 
     /**
      * Builder method names that should not be used in the Model.
      *
-     * @var list<string>
+     * @var list<string> method name
      */
     private array $builderMethodsNotAvailable = [
         'getCompiledInsert',
@@ -148,7 +148,9 @@ class Model extends BaseModel
 
     public function __construct(?ConnectionInterface $db = null, ?ValidationInterface $validation = null)
     {
-        /** @var BaseConnection $db */
+        /**
+         * @var BaseConnection|null $db
+         */
         $db ??= Database::connect($this->DBGroup);
 
         $this->db = $db;
@@ -157,7 +159,9 @@ class Model extends BaseModel
     }
 
     /**
-     * Specify the table associated with a model.
+     * Specify the table associated with a model
+     *
+     * @param string $table Table
      *
      * @return $this
      */
@@ -168,25 +172,27 @@ class Model extends BaseModel
         return $this;
     }
 
+    /**
+     * Fetches the row of database from $this->table with a primary key
+     * matching $id.
+     * This method works only with dbCalls.
+     *
+     * @param bool                  $singleton Single or multiple results
+     * @param array|int|string|null $id        One primary key or an array of primary keys
+     *
+     * @return         array|object|null                                                     The resulting row of data, or null.
+     * @phpstan-return ($singleton is true ? row_array|null|object : list<row_array|object>)
+     */
     protected function doFind(bool $singleton, $id = null)
     {
         $builder = $this->builder();
-        $useCast = $this->useCasts();
-
-        if ($useCast) {
-            $returnType = $this->tempReturnType;
-            $this->asArray();
-        }
 
         if ($this->tempUseSoftDeletes) {
             $builder->where($this->table . '.' . $this->deletedField, null);
         }
 
-        $row  = null;
-        $rows = [];
-
         if (is_array($id)) {
-            $rows = $builder->whereIn($this->table . '.' . $this->primaryKey, $id)
+            $row = $builder->whereIn($this->table . '.' . $this->primaryKey, $id)
                 ->get()
                 ->getResult($this->tempReturnType);
         } elseif ($singleton) {
@@ -194,117 +200,86 @@ class Model extends BaseModel
                 ->get()
                 ->getFirstRow($this->tempReturnType);
         } else {
-            $rows = $builder->get()->getResult($this->tempReturnType);
+            $row = $builder->get()->getResult($this->tempReturnType);
         }
 
-        if ($useCast) {
-            $this->tempReturnType = $returnType;
-
-            if ($singleton) {
-                if ($row === null) {
-                    return null;
-                }
-
-                return $this->convertToReturnType($row, $returnType);
-            }
-
-            foreach ($rows as $i => $row) {
-                $rows[$i] = $this->convertToReturnType($row, $returnType);
-            }
-
-            return $rows;
-        }
-
-        if ($singleton) {
-            return $row;
-        }
-
-        return $rows;
+        return $row;
     }
 
+    /**
+     * Fetches the column of database from $this->table.
+     * This method works only with dbCalls.
+     *
+     * @param string $columnName Column Name
+     *
+     * @return         array|null           The resulting row of data, or null if no data found.
+     * @phpstan-return list<row_array>|null
+     */
     protected function doFindColumn(string $columnName)
     {
         return $this->select($columnName)->asArray()->find();
     }
 
     /**
-     * {@inheritDoc}
+     * Works with the current Query Builder instance to return
+     * all results, while optionally limiting them.
+     * This method works only with dbCalls.
      *
-     * Works with the current Query Builder instance.
+     * @param int $limit  Limit
+     * @param int $offset Offset
+     *
+     * @return         array
+     * @phpstan-return list<row_array|object>
      */
-    protected function doFindAll(?int $limit = null, int $offset = 0)
+    protected function doFindAll(int $limit = 0, int $offset = 0)
     {
-        $limitZeroAsAll = config(Feature::class)->limitZeroAsAll ?? true; // @phpstan-ignore nullCoalesce.property
-        if ($limitZeroAsAll) {
-            $limit ??= 0;
-        }
-
         $builder = $this->builder();
-
-        $useCast = $this->useCasts();
-        if ($useCast) {
-            $returnType = $this->tempReturnType;
-            $this->asArray();
-        }
 
         if ($this->tempUseSoftDeletes) {
             $builder->where($this->table . '.' . $this->deletedField, null);
         }
 
-        $results = $builder->limit($limit, $offset)
+        return $builder->limit($limit, $offset)
             ->get()
             ->getResult($this->tempReturnType);
-
-        if ($useCast) {
-            foreach ($results as $i => $row) {
-                $results[$i] = $this->convertToReturnType($row, $returnType);
-            }
-
-            $this->tempReturnType = $returnType;
-        }
-
-        return $results;
     }
 
     /**
-     * {@inheritDoc}
+     * Returns the first row of the result set. Will take any previous
+     * Query Builder calls into account when determining the result set.
+     * This method works only with dbCalls.
      *
-     * Will take any previous Query Builder calls into account
-     * when determining the result set.
+     * @return         array|object|null
+     * @phpstan-return row_array|object|null
      */
     protected function doFirst()
     {
         $builder = $this->builder();
 
-        $useCast = $this->useCasts();
-        if ($useCast) {
-            $returnType = $this->tempReturnType;
-            $this->asArray();
-        }
-
         if ($this->tempUseSoftDeletes) {
             $builder->where($this->table . '.' . $this->deletedField, null);
-        } elseif ($this->useSoftDeletes && ($builder->QBGroupBy === []) && $this->primaryKey !== '') {
+        } elseif ($this->useSoftDeletes && ($builder->QBGroupBy === []) && $this->primaryKey) {
             $builder->groupBy($this->table . '.' . $this->primaryKey);
         }
 
         // Some databases, like PostgreSQL, need order
         // information to consistently return correct results.
-        if ($builder->QBGroupBy !== [] && ($builder->QBOrderBy === []) && $this->primaryKey !== '') {
+        if ($builder->QBGroupBy && ($builder->QBOrderBy === []) && $this->primaryKey) {
             $builder->orderBy($this->table . '.' . $this->primaryKey, 'asc');
         }
 
-        $row = $builder->limit(1, 0)->get()->getFirstRow($this->tempReturnType);
-
-        if ($useCast && $row !== null) {
-            $row = $this->convertToReturnType($row, $returnType);
-
-            $this->tempReturnType = $returnType;
-        }
-
-        return $row;
+        return $builder->limit(1, 0)->get()->getFirstRow($this->tempReturnType);
     }
 
+    /**
+     * Inserts data into the current table.
+     * This method works only with dbCalls.
+     *
+     * @param         array     $row Row data
+     * @phpstan-param row_array $row
+     *
+     * @return bool
+     */
     protected function doInsert(array $row)
     {
         $escape       = $this->escape;
@@ -312,13 +287,8 @@ class Model extends BaseModel
 
         // Require non-empty primaryKey when
         // not using auto-increment feature
-        if (! $this->useAutoIncrement) {
-            if (! isset($row[$this->primaryKey])) {
-                throw DataException::forEmptyPrimaryKey('insert');
-            }
-
-            // Validate the primary key value (arrays not allowed for insert)
-            $this->validateID($row[$this->primaryKey], false);
+        if (! $this->useAutoIncrement && ! isset($row[$this->primaryKey])) {
+            throw DataException::forEmptyPrimaryKey('insert');
         }
 
         $builder = $this->builder();
@@ -336,17 +306,17 @@ class Model extends BaseModel
                 $allFields = $this->db->protectIdentifiers(
                     array_map(
                         static fn ($row) => $row->name,
-                        $this->db->getFieldData($this->table),
+                        $this->db->getFieldData($this->table)
                     ),
                     false,
-                    true,
+                    true
                 );
 
                 $sql = sprintf(
                     'INSERT INTO %s (%s) VALUES (%s)',
                     $table,
                     implode(',', $allFields),
-                    substr(str_repeat(',DEFAULT', count($allFields)), 1),
+                    substr(str_repeat(',DEFAULT', count($allFields)), 1)
                 );
             } else {
                 $sql = 'INSERT INTO ' . $table . ' DEFAULT VALUES';
@@ -359,30 +329,46 @@ class Model extends BaseModel
 
         // If insertion succeeded then save the insert ID
         if ($result) {
-            $this->insertID = $this->useAutoIncrement ? $this->db->insertID() : $row[$this->primaryKey];
+            $this->insertID = ! $this->useAutoIncrement ? $row[$this->primaryKey] : $this->db->insertID();
         }
 
         return $result;
     }
 
+    /**
+     * Compiles batch insert strings and runs the queries, validating each row prior.
+     * This method works only with dbCalls.
+     *
+     * @param array|null $set       An associative array of insert values
+     * @param bool|null  $escape    Whether to escape values
+     * @param int        $batchSize The size of the batch to run
+     * @param bool       $testing   True means only number of records is returned, false will execute the query
+     *
+     * @return bool|int Number of rows inserted or FALSE on failure
+     */
     protected function doInsertBatch(?array $set = null, ?bool $escape = null, int $batchSize = 100, bool $testing = false)
     {
-        if (is_array($set) && ! $this->useAutoIncrement) {
+        if (is_array($set)) {
             foreach ($set as $row) {
-                // Require non-empty $primaryKey when
+                // Require non-empty primaryKey when
                 // not using auto-increment feature
-                if (! isset($row[$this->primaryKey])) {
+                if (! $this->useAutoIncrement && ! isset($row[$this->primaryKey])) {
                     throw DataException::forEmptyPrimaryKey('insertBatch');
                 }
-
-                // Validate the primary key value
-                $this->validateID($row[$this->primaryKey], false);
             }
         }
 
         return $this->builder()->testMode($testing)->insertBatch($set, $escape, $batchSize);
     }
 
+    /**
+     * Updates a single record in $this->table.
+     * This method works only with dbCalls.
+     *
+     * @param         array|int|string|null $id
+     * @param         array|null            $row Row data
+     * @phpstan-param row_array|null        $row
+     */
     protected function doUpdate($id = null, $row = null): bool
     {
         $escape       = $this->escape;
@@ -390,7 +376,7 @@ class Model extends BaseModel
 
         $builder = $this->builder();
 
-        if (is_array($id) && $id !== []) {
+        if ($id) {
             $builder = $builder->whereIn($this->table . '.' . $this->primaryKey, $id);
         }
 
@@ -401,31 +387,56 @@ class Model extends BaseModel
 
         if ($builder->getCompiledQBWhere() === []) {
             throw new DatabaseException(
-                'Updates are not allowed unless they contain a "where" or "like" clause.',
+                'Updates are not allowed unless they contain a "where" or "like" clause.'
             );
         }
 
         return $builder->update();
     }
 
+    /**
+     * Compiles an update string and runs the query
+     * This method works only with dbCalls.
+     *
+     * @param array|null  $set       An associative array of update values
+     * @param string|null $index     The where key
+     * @param int         $batchSize The size of the batch to run
+     * @param bool        $returnSQL True means SQL is returned, false will execute the query
+     *
+     * @return false|int|list<string> Number of rows affected or FALSE on failure, SQL array when testMode
+     *
+     * @throws DatabaseException
+     */
     protected function doUpdateBatch(?array $set = null, ?string $index = null, int $batchSize = 100, bool $returnSQL = false)
     {
         return $this->builder()->testMode($returnSQL)->updateBatch($set, $index, $batchSize);
     }
 
+    /**
+     * Deletes a single record from $this->table where $id matches
+     * the table's primaryKey
+     * This method works only with dbCalls.
+     *
+     * @param array|int|string|null $id    The rows primary key(s)
+     * @param bool                  $purge Allows overriding the soft deletes setting.
+     *
+     * @return bool|string SQL string when testMode
+     *
+     * @throws DatabaseException
+     */
     protected function doDelete($id = null, bool $purge = false)
     {
         $set     = [];
         $builder = $this->builder();
 
-        if (is_array($id) && $id !== []) {
+        if ($id) {
             $builder = $builder->whereIn($this->primaryKey, $id);
         }
 
         if ($this->useSoftDeletes && ! $purge) {
             if ($builder->getCompiledQBWhere() === []) {
                 throw new DatabaseException(
-                    'Deletes are not allowed unless they contain a "where" or "like" clause.',
+                    'Deletes are not allowed unless they contain a "where" or "like" clause.'
                 );
             }
 
@@ -443,6 +454,13 @@ class Model extends BaseModel
         return $builder->delete();
     }
 
+    /**
+     * Permanently deletes all rows that have been marked as deleted
+     * through soft deletes (deleted = 1)
+     * This method works only with dbCalls.
+     *
+     * @return bool|string Returns a SQL string if in test mode.
+     */
     protected function doPurgeDeleted()
     {
         return $this->builder()
@@ -450,22 +468,40 @@ class Model extends BaseModel
             ->delete();
     }
 
+    /**
+     * Works with the find* methods to return only the rows that
+     * have been deleted.
+     * This method works only with dbCalls.
+     *
+     * @return void
+     */
     protected function doOnlyDeleted()
     {
         $this->builder()->where($this->table . '.' . $this->deletedField . ' IS NOT NULL');
     }
 
+    /**
+     * Compiles a replace into string and runs the query
+     * This method works only with dbCalls.
+     *
+     * @param         array|null     $row       Data
+     * @phpstan-param row_array|null $row
+     * @param         bool           $returnSQL Set to true to return Query String
+     *
+     * @return BaseResult|false|Query|string
+     */
     protected function doReplace(?array $row = null, bool $returnSQL = false)
     {
         return $this->builder()->testMode($returnSQL)->replace($row);
     }
 
     /**
-     * {@inheritDoc}
-     *
+     * Grabs the last error(s) that occurred from the Database connection.
      * The return array should be in the following format:
-     *  `['source' => 'message']`.
+     *  ['source' => 'message']
      * This method works only with dbCalls.
+     *
+     * @return array<string, string>
      */
     protected function doErrors()
     {
@@ -476,14 +512,36 @@ class Model extends BaseModel
             return [];
         }
 
-        return [$this->db::class => $error['message']];
+        return [get_class($this->db) => $error['message']];
     }
 
+    /**
+     * Returns the id value for the data array or object
+     *
+     * @param array|object $data Data
+     *
+     * @return array|int|string|null
+     *
+     * @deprecated Use getIdValue() instead. Will be removed in version 5.0.
+     */
+    protected function idValue($data)
+    {
+        return $this->getIdValue($data);
+    }
+
+    /**
+     * Returns the id value for the data array or object
+     *
+     * @param         array|object     $row Row data
+     * @phpstan-param row_array|object $row
+     *
+     * @return array|int|string|null
+     */
     public function getIdValue($row)
     {
-        if (is_object($row)) {
-            // Get the raw or mapped primary key value of the Entity.
-            if ($row instanceof Entity && $row->{$this->primaryKey} !== null) {
+        if (is_object($row) && isset($row->{$this->primaryKey})) {
+            // Get the raw primary key value of the Entity.
+            if ($row instanceof Entity) {
                 $cast = $row->cast();
 
                 // Disable Entity casting, because raw primary key value is needed for database.
@@ -497,9 +555,7 @@ class Model extends BaseModel
                 return $primaryKey;
             }
 
-            if (! $row instanceof Entity && isset($row->{$this->primaryKey})) {
-                return $row->{$this->primaryKey};
-            }
+            return $row->{$this->primaryKey};
         }
 
         if (is_array($row) && isset($row[$this->primaryKey])) {
@@ -509,39 +565,22 @@ class Model extends BaseModel
         return null;
     }
 
-    public function countAllResults(bool $reset = true, bool $test = false)
-    {
-        if ($this->tempUseSoftDeletes) {
-            $this->builder()->where($this->table . '.' . $this->deletedField, null);
-        }
-
-        // When $reset === false, the $tempUseSoftDeletes will be
-        // dependent on $useSoftDeletes value because we don't
-        // want to add the same "where" condition for the second time.
-        $this->tempUseSoftDeletes = $reset
-            ? $this->useSoftDeletes
-            : ($this->useSoftDeletes ? false : $this->useSoftDeletes);
-
-        return $this->builder()->testMode($test)->countAllResults($reset);
-    }
-
     /**
-     * {@inheritDoc}
-     *
-     * Works with `$this->builder` to get the Compiled select to
+     * Loops over records in batches, allowing you to operate on them.
+     * Works with $this->builder to get the Compiled select to
      * determine the rows to operate on.
      * This method works only with dbCalls.
+     *
+     * @return void
+     *
+     * @throws DataException
      */
     public function chunk(int $size, Closure $userFunc)
     {
-        if ($size <= 0) {
-            throw new InvalidArgumentException('chunk() requires a positive integer for the $size argument.');
-        }
-
         $total  = $this->builder()->countAllResults(false);
         $offset = 0;
 
-        while ($offset < $total) {
+        while ($offset <= $total) {
             $builder = clone $this->builder();
             $rows    = $builder->get($size, $offset);
 
@@ -566,6 +605,27 @@ class Model extends BaseModel
     }
 
     /**
+     * Override countAllResults to account for soft deleted accounts.
+     *
+     * @return int|string
+     */
+    public function countAllResults(bool $reset = true, bool $test = false)
+    {
+        if ($this->tempUseSoftDeletes) {
+            $this->builder()->where($this->table . '.' . $this->deletedField, null);
+        }
+
+        // When $reset === false, the $tempUseSoftDeletes will be
+        // dependent on $useSoftDeletes value because we don't
+        // want to add the same "where" condition for the second time
+        $this->tempUseSoftDeletes = $reset
+            ? $this->useSoftDeletes
+            : ($this->useSoftDeletes ? false : $this->useSoftDeletes);
+
+        return $this->builder()->testMode($test)->countAllResults($reset);
+    }
+
+    /**
      * Provides a shared instance of the Query Builder.
      *
      * @param non-empty-string|null $table
@@ -579,7 +639,7 @@ class Model extends BaseModel
         // Check for an existing Builder
         if ($this->builder instanceof BaseBuilder) {
             // Make sure the requested table matches the builder
-            if ((string) $table !== '' && $this->builder->getTable() !== $table) {
+            if ($table && $this->builder->getTable() !== $table) {
                 return $this->db->table($table);
             }
 
@@ -593,7 +653,7 @@ class Model extends BaseModel
             throw ModelException::forNoPrimaryKey(static::class);
         }
 
-        $table = ((string) $table === '') ? $this->table : $table;
+        $table = ($table === null || $table === '') ? $this->table : $table;
 
         // Ensure we have a good db connection
         if (! $this->db instanceof BaseConnection) {
@@ -615,7 +675,7 @@ class Model extends BaseModel
      * data here. This allows it to be used with any of the other
      * builder methods and still get validated data, like replace.
      *
-     * @param object|row_array|string           $key    Field name, or an array of field/value pairs, or an object
+     * @param array|object|string               $key    Field name, or an array of field/value pairs, or an object
      * @param bool|float|int|object|string|null $value  Field value, if $key is a single field
      * @param bool|null                         $escape Whether to escape values
      *
@@ -638,6 +698,12 @@ class Model extends BaseModel
         return $this;
     }
 
+    /**
+     * This method is called on save to determine if entry have to be updated
+     * If this method return false insert operation will be executed
+     *
+     * @param array|object $row Data
+     */
     protected function shouldUpdate($row): bool
     {
         if (parent::shouldUpdate($row) === false) {
@@ -653,6 +719,19 @@ class Model extends BaseModel
         return $this->where($this->primaryKey, $this->getIdValue($row))->countAllResults() === 1;
     }
 
+    /**
+     * Inserts data into the database. If an object is provided,
+     * it will attempt to convert it to an array.
+     *
+     * @param         array|object|null     $row
+     * @phpstan-param row_array|object|null $row
+     * @param         bool                  $returnID Whether insert ID should be returned or not.
+     *
+     * @return         bool|int|string
+     * @phpstan-return ($returnID is true ? int|string|false : bool)
+     *
+     * @throws ReflectionException
+     */
     public function insert($row = null, bool $returnID = true)
     {
         if (isset($this->tempData['data'])) {
@@ -670,6 +749,18 @@ class Model extends BaseModel
         return parent::insert($row, $returnID);
     }
 
+    /**
+     * Ensures that only the fields that are allowed to be inserted are in
+     * the data array.
+     *
+     * @used-by insert() to protect against mass assignment vulnerabilities.
+     * @used-by insertBatch() to protect against mass assignment vulnerabilities.
+     *
+     * @param         array     $row Row data
+     * @phpstan-param row_array $row
+     *
+     * @throws DataException
+     */
     protected function doProtectFieldsForInsert(array $row): array
     {
         if (! $this->protectFields) {
@@ -694,6 +785,16 @@ class Model extends BaseModel
         return $row;
     }
 
+    /**
+     * Updates a single record in the database. If an object is provided,
+     * it will attempt to convert it into an array.
+     *
+     * @param         array|int|string|null $id
+     * @param         array|object|null     $row
+     * @phpstan-param row_array|object|null $row
+     *
+     * @throws ReflectionException
+     */
     public function update($id = null, $row = null): bool
     {
         if (isset($this->tempData['data'])) {
@@ -712,9 +813,27 @@ class Model extends BaseModel
     }
 
     /**
+     * Takes a class and returns an array of its public and protected
+     * properties as an array with raw values.
+     *
+     * @param object $object    Object
+     * @param bool   $recursive If true, inner entities will be cast as array as well
+     *
+     * @return array<string, mixed>
+     *
+     * @throws ReflectionException
+     */
+    protected function objectToRawArray($object, bool $onlyChanged = true, bool $recursive = false): array
+    {
+        return parent::objectToRawArray($object, $onlyChanged);
+    }
+
+    /**
      * Provides/instantiates the builder/db connection and model's table/primary key names and return type.
      *
-     * @return mixed
+     * @param string $name Name
+     *
+     * @return array|BaseBuilder|bool|float|int|object|string|null
      */
     public function __get(string $name)
     {
@@ -727,6 +846,8 @@ class Model extends BaseModel
 
     /**
      * Checks for the existence of properties across this model, builder, and db connection.
+     *
+     * @param string $name Name
      */
     public function __isset(string $name): bool
     {
@@ -741,7 +862,7 @@ class Model extends BaseModel
      * Provides direct access to method in the builder (if available)
      * and the database connection.
      *
-     * @return mixed
+     * @return $this|array|BaseBuilder|bool|float|int|object|string|null
      */
     public function __call(string $name, array $params)
     {
@@ -773,5 +894,71 @@ class Model extends BaseModel
         if (in_array($name, $this->builderMethodsNotAvailable, true)) {
             throw ModelException::forMethodNotAvailable(static::class, $name . '()');
         }
+    }
+
+    /**
+     * Takes a class an returns an array of it's public and protected
+     * properties as an array suitable for use in creates and updates.
+     *
+     * @param object|string $data
+     * @param string|null   $primaryKey
+     *
+     * @throws ReflectionException
+     *
+     * @codeCoverageIgnore
+     *
+     * @deprecated 4.1.0
+     */
+    public static function classToArray($data, $primaryKey = null, string $dateFormat = 'datetime', bool $onlyChanged = true): array
+    {
+        if (method_exists($data, 'toRawArray')) {
+            $properties = $data->toRawArray($onlyChanged);
+
+            // Always grab the primary key otherwise updates will fail.
+            if ($properties !== [] && isset($primaryKey) && ! in_array($primaryKey, $properties, true) && isset($data->{$primaryKey})) {
+                $properties[$primaryKey] = $data->{$primaryKey};
+            }
+        } else {
+            $mirror = new ReflectionClass($data);
+            $props  = $mirror->getProperties(ReflectionProperty::IS_PUBLIC | ReflectionProperty::IS_PROTECTED);
+
+            $properties = [];
+
+            // Loop over each property,
+            // saving the name/value in a new array we can return.
+            foreach ($props as $prop) {
+                // Must make protected values accessible.
+                $prop->setAccessible(true);
+                $properties[$prop->getName()] = $prop->getValue($data);
+            }
+        }
+
+        // Convert any Time instances to appropriate $dateFormat
+        if ($properties) {
+            foreach ($properties as $key => $value) {
+                if ($value instanceof Time) {
+                    switch ($dateFormat) {
+                        case 'datetime':
+                            $converted = $value->format('Y-m-d H:i:s');
+                            break;
+
+                        case 'date':
+                            $converted = $value->format('Y-m-d');
+                            break;
+
+                        case 'int':
+                            $converted = $value->getTimestamp();
+                            break;
+
+                        default:
+                            $converted = (string) $value;
+                    }
+
+                    $properties[$key] = $converted;
+                }
+            }
+        }
+
+        return $properties;
     }
 }

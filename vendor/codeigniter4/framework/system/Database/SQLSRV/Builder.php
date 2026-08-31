@@ -1,7 +1,5 @@
 <?php
 
-declare(strict_types=1);
-
 /**
  * This file is part of CodeIgniter 4 framework.
  *
@@ -14,13 +12,10 @@ declare(strict_types=1);
 namespace CodeIgniter\Database\SQLSRV;
 
 use CodeIgniter\Database\BaseBuilder;
-use CodeIgniter\Database\BaseResult;
 use CodeIgniter\Database\Exceptions\DatabaseException;
 use CodeIgniter\Database\Exceptions\DataException;
-use CodeIgniter\Database\Query;
 use CodeIgniter\Database\RawSql;
 use CodeIgniter\Database\ResultInterface;
-use Config\Feature;
 
 /**
  * Builder for SQLSRV
@@ -74,7 +69,7 @@ class Builder extends BaseBuilder
         $from = [];
 
         foreach ($this->QBFrom as $value) {
-            $from[] = str_starts_with($value, '(SELECT') ? $value : $this->getFullName($value);
+            $from[] = strpos($value, '(SELECT') === 0 ? $value : $this->getFullName($value);
         }
 
         return implode(', ', $from);
@@ -124,7 +119,7 @@ class Builder extends BaseBuilder
             $cond = ' ON ' . $cond;
         } else {
             // Split multiple conditions
-            if (preg_match_all('/\sAND\s|\sOR\s/i', $cond, $joints, PREG_OFFSET_CAPTURE) >= 1) {
+            if (preg_match_all('/\sAND\s|\sOR\s/i', $cond, $joints, PREG_OFFSET_CAPTURE)) {
                 $conditions = [];
                 $joints     = $joints[0];
                 array_unshift($joints, ['', 0]);
@@ -146,13 +141,6 @@ class Builder extends BaseBuilder
 
             foreach ($conditions as $i => $condition) {
                 $operator = $this->getOperator($condition);
-
-                // Workaround for BETWEEN
-                if ($operator === false) {
-                    $cond .= $joints[$i] . $condition;
-
-                    continue;
-                }
 
                 $cond .= $joints[$i];
                 $cond .= preg_match('/(\(*)?([\[\]\w\.\'-]+)' . preg_quote($operator, '/') . '(.*)/i', $condition, $match) ? $match[1] . $this->db->protectIdentifiers($match[2]) . $operator . $this->db->protectIdentifiers($match[3]) : $condition;
@@ -271,7 +259,7 @@ class Builder extends BaseBuilder
         if ($this->castTextToInt) {
             $values = [$column => "CONVERT(VARCHAR(MAX),CONVERT(INT,CONVERT(VARCHAR(MAX), {$column})) - {$value})"];
         } else {
-            $values = [$column => "{$column} - {$value}"];
+            $values = [$column => "{$column} + {$value}"];
         }
 
         $sql = $this->_update($this->QBFrom[0], $values);
@@ -292,30 +280,13 @@ class Builder extends BaseBuilder
     {
         $alias = '';
 
-        if (str_contains($table, ' ')) {
+        if (strpos($table, ' ') !== false) {
             $alias = explode(' ', $table);
             $table = array_shift($alias);
             $alias = ' ' . implode(' ', $alias);
         }
 
         if ($this->db->escapeChar === '"') {
-            if (str_contains($table, '.') && ! str_starts_with($table, '.') && ! str_ends_with($table, '.')) {
-                $dbInfo   = explode('.', $table);
-                $database = $this->db->getDatabase();
-                $table    = $dbInfo[0];
-
-                if (count($dbInfo) === 3) {
-                    $database  = str_replace('"', '', $dbInfo[0]);
-                    $schema    = str_replace('"', '', $dbInfo[1]);
-                    $tableName = str_replace('"', '', $dbInfo[2]);
-                } else {
-                    $schema    = str_replace('"', '', $dbInfo[0]);
-                    $tableName = str_replace('"', '', $dbInfo[1]);
-                }
-
-                return '"' . $database . '"."' . $schema . '"."' . str_replace('"', '', $tableName) . '"' . $alias;
-            }
-
             return '"' . $this->db->getDatabase() . '"."' . $this->db->schema . '"."' . str_replace('"', '', $table) . '"' . $alias;
         }
 
@@ -323,7 +294,7 @@ class Builder extends BaseBuilder
     }
 
     /**
-     * Add permission statements for index value inserts
+     * Add permision statements for index value inserts
      */
     private function addIdentity(string $fullTable, string $insert): string
     {
@@ -335,15 +306,6 @@ class Builder extends BaseBuilder
      */
     protected function _limit(string $sql, bool $offsetIgnore = false): string
     {
-        // SQL Server cannot handle `LIMIT 0`.
-        // DatabaseException:
-        //   [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]The number of
-        //   rows provided for a FETCH clause must be greater then zero.
-        $limitZeroAsAll = config(Feature::class)->limitZeroAsAll ?? true; // @phpstan-ignore nullCoalesce.property
-        if (! $limitZeroAsAll && $this->QBLimit === 0) {
-            return "SELECT * \nFROM " . $this->_fromTables() . ' WHERE 1=0 ';
-        }
-
         if (empty($this->QBOrderBy)) {
             $sql .= ' ORDER BY (SELECT NULL) ';
         }
@@ -360,7 +322,7 @@ class Builder extends BaseBuilder
     /**
      * Compiles a replace into string and runs the query
      *
-     * @return BaseResult|false|Query|string
+     * @return mixed
      *
      * @throws DatabaseException
      */
@@ -422,7 +384,7 @@ class Builder extends BaseBuilder
 
         // Get the binds
         $binds = $this->binds;
-        array_walk($binds, static function (&$item): void {
+        array_walk($binds, static function (&$item) {
             $item = $item[0];
         });
 
@@ -464,7 +426,7 @@ class Builder extends BaseBuilder
      *
      * Handle float return value
      *
-     * @return $this
+     * @return BaseBuilder
      */
     protected function maxMinAvgSum(string $select = '', string $alias = '', string $type = 'MAX')
     {
@@ -477,7 +439,7 @@ class Builder extends BaseBuilder
             throw DataException::forEmptyInputGiven('Select');
         }
 
-        if (str_contains($select, ',')) {
+        if (strpos($select, ',') !== false) {
             throw DataException::forInvalidArgument('Column name not separated by comma');
         }
 
@@ -520,7 +482,7 @@ class Builder extends BaseBuilder
 
         $query = $query->getRow();
 
-        if ($reset) {
+        if ($reset === true) {
             $this->resetSelect();
         }
 
@@ -538,9 +500,9 @@ class Builder extends BaseBuilder
     /**
      * Compiles a delete string and runs the query
      *
-     * @param array<int|string, mixed>|RawSql|string $where
+     * @param mixed $where
      *
-     * @return bool|string
+     * @return mixed
      *
      * @throws DatabaseException
      */
@@ -578,7 +540,7 @@ class Builder extends BaseBuilder
      *
      * Generates a query string based on which functions were used.
      *
-     * @param false|string $selectOverride
+     * @param bool $selectOverride
      */
     protected function compileSelect($selectOverride = false): string
     {
@@ -586,7 +548,7 @@ class Builder extends BaseBuilder
         if ($selectOverride !== false) {
             $sql = $selectOverride;
         } else {
-            $sql = $this->QBDistinct ? 'SELECT DISTINCT ' : 'SELECT ';
+            $sql = (! $this->QBDistinct) ? 'SELECT ' : 'SELECT DISTINCT ';
 
             // SQL Server can't work with select * if group by is specified
             if (empty($this->QBSelect) && $this->QBGroupBy !== [] && is_array($this->QBGroupBy)) {
@@ -626,12 +588,7 @@ class Builder extends BaseBuilder
             . $this->compileOrderBy(); // ORDER BY
 
         // LIMIT
-        $limitZeroAsAll = config(Feature::class)->limitZeroAsAll ?? true; // @phpstan-ignore nullCoalesce.property
-        if ($limitZeroAsAll) {
-            if ($this->QBLimit) {
-                $sql = $this->_limit($sql . "\n");
-            }
-        } elseif ($this->QBLimit !== false || $this->QBOffset) {
+        if ($this->QBLimit) {
             $sql = $this->_limit($sql . "\n");
         }
 
@@ -646,11 +603,6 @@ class Builder extends BaseBuilder
      */
     public function get(?int $limit = null, int $offset = 0, bool $reset = true)
     {
-        $limitZeroAsAll = config(Feature::class)->limitZeroAsAll ?? true; // @phpstan-ignore nullCoalesce.property
-        if ($limitZeroAsAll && $limit === 0) {
-            $limit = null;
-        }
-
         if ($limit !== null) {
             $this->limit($limit, $offset);
         }
@@ -696,12 +648,12 @@ class Builder extends BaseBuilder
 
             $identityInFields = in_array($tableIdentity, $keys, true);
 
-            $fieldNames = array_map(static fn ($columnName): string => trim($columnName, '"'), $keys);
+            $fieldNames = array_map(static fn ($columnName) => trim($columnName, '"'), $keys);
 
             if (empty($constraints)) {
                 $tableIndexes = $this->db->getIndexData($table);
 
-                $uniqueIndexes = array_filter($tableIndexes, static function ($index) use ($fieldNames): bool {
+                $uniqueIndexes = array_filter($tableIndexes, static function ($index) use ($fieldNames) {
                     $hasAllFields = count(array_intersect($index->fields, $fieldNames)) === count($index->fields);
 
                     return $index->type === 'PRIMARY' && $hasAllFields;
@@ -709,7 +661,7 @@ class Builder extends BaseBuilder
 
                 // if no primary found then look for unique - since indexes have no order
                 if ($uniqueIndexes === []) {
-                    $uniqueIndexes = array_filter($tableIndexes, static function ($index) use ($fieldNames): bool {
+                    $uniqueIndexes = array_filter($tableIndexes, static function ($index) use ($fieldNames) {
                         $hasAllFields = count(array_intersect($index->fields, $fieldNames)) === count($index->fields);
 
                         return $index->type === 'UNIQUE' && $hasAllFields;
@@ -752,7 +704,7 @@ class Builder extends BaseBuilder
             $sql .= implode(
                 ' AND ',
                 array_map(
-                    static fn ($key, $value): RawSql|string => (
+                    static fn ($key, $value) => (
                         ($value instanceof RawSql && is_string($key))
                         ?
                         $fullTableName . '.' . $key . ' = ' . $value
@@ -766,8 +718,8 @@ class Builder extends BaseBuilder
                         )
                     ),
                     array_keys($constraints),
-                    $constraints,
-                ),
+                    $constraints
+                )
             ) . ")\n";
 
             $sql .= "WHEN MATCHED THEN UPDATE SET\n";
@@ -775,12 +727,12 @@ class Builder extends BaseBuilder
             $sql .= implode(
                 ",\n",
                 array_map(
-                    static fn ($key, $value): string => $key . ($value instanceof RawSql ?
+                    static fn ($key, $value) => $key . ($value instanceof RawSql ?
                         ' = ' . $value :
                     " = {$alias}.{$value}"),
                     array_keys($updateFields),
-                    $updateFields,
-                ),
+                    $updateFields
+                )
             );
 
             $sql .= "\nWHEN NOT MATCHED THEN INSERT (" . implode(', ', $keys) . ")\nVALUES ";
@@ -789,13 +741,13 @@ class Builder extends BaseBuilder
                 '(' . implode(
                     ', ',
                     array_map(
-                        static fn ($columnName): string => $columnName === $tableIdentity
+                        static fn ($columnName) => $columnName === $tableIdentity
                     ? "CASE WHEN {$alias}.{$columnName} IS NULL THEN (SELECT "
                     . 'isnull(IDENT_CURRENT(\'' . $fullTableName . '\')+IDENT_INCR(\''
                     . $fullTableName . "'),1)) ELSE {$alias}.{$columnName} END"
                     : "{$alias}.{$columnName}",
-                        $keys,
-                    ),
+                        $keys
+                    )
                 ) . ');'
             );
 

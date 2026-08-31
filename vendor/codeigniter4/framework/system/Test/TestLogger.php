@@ -1,7 +1,5 @@
 <?php
 
-declare(strict_types=1);
-
 /**
  * This file is part of CodeIgniter 4 framework.
  *
@@ -14,7 +12,6 @@ declare(strict_types=1);
 namespace CodeIgniter\Test;
 
 use CodeIgniter\Log\Logger;
-use Stringable;
 
 /**
  * @see \CodeIgniter\Test\TestLoggerTest
@@ -33,7 +30,7 @@ class TestLogger extends Logger
      * @param mixed  $level
      * @param string $message
      */
-    public function log($level, string|Stringable $message, array $context = []): void
+    public function log($level, $message, array $context = []): bool
     {
         // While this requires duplicate work, we want to ensure
         // we have the final message to test against.
@@ -58,7 +55,7 @@ class TestLogger extends Logger
         ];
 
         // Let the parent do it's thing.
-        parent::log($level, $message, $context);
+        return parent::log($level, $message, $context);
     }
 
     /**
@@ -85,11 +82,25 @@ class TestLogger extends Logger
                 continue;
             }
 
-            if (str_contains($log['message'], $message)) {
+            if (strpos($log['message'], $message) !== false) {
                 return true;
             }
         }
 
         return false;
+    }
+
+    /**
+     * Expose filenames.
+     *
+     * @param string $file
+     *
+     * @return string
+     *
+     * @deprecated No longer needed as underlying protected method is also deprecated.
+     */
+    public function cleanup($file)
+    {
+        return clean_path($file);
     }
 }

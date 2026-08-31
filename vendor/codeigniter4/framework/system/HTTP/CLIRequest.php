@@ -1,7 +1,5 @@
 <?php
 
-declare(strict_types=1);
-
 /**
  * This file is part of CodeIgniter 4 framework.
  *
@@ -13,9 +11,9 @@ declare(strict_types=1);
 
 namespace CodeIgniter\HTTP;
 
-use CodeIgniter\Exceptions\RuntimeException;
 use Config\App;
 use Locale;
+use RuntimeException;
 
 /**
  * Represents a request from the command-line. Provides additional
@@ -58,7 +56,7 @@ class CLIRequest extends Request
      *
      * @var string
      */
-    protected $method = 'CLI';
+    protected $method = 'cli';
 
     /**
      * Constructor
@@ -95,7 +93,9 @@ class CLIRequest extends Request
      */
     public function getPath(): string
     {
-        return implode('/', $this->segments);
+        $path = implode('/', $this->segments);
+
+        return ($path === '') ? '' : $path;
     }
 
     /**
@@ -164,7 +164,7 @@ class CLIRequest extends Request
                 continue;
             }
 
-            if (str_contains($value, ' ')) {
+            if (mb_strpos($value, ' ') !== false) {
                 $out .= '"' . $value . '" ';
             } else {
                 $out .= "{$value} ";
@@ -314,6 +314,9 @@ class CLIRequest extends Request
 
     /**
      * Checks this request type.
+     *
+     * @param         string                                                                    $type HTTP verb or 'json' or 'ajax'
+     * @phpstan-param string|'get'|'post'|'put'|'delete'|'head'|'patch'|'options'|'json'|'ajax' $type
      */
     public function is(string $type): bool
     {

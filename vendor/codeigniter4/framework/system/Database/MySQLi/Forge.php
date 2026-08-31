@@ -1,7 +1,5 @@
 <?php
 
-declare(strict_types=1);
-
 /**
  * This file is part of CodeIgniter 4 framework.
  *
@@ -116,11 +114,11 @@ class Forge extends BaseForge
             }
         }
 
-        if ($this->db->charset !== '' && ! str_contains($sql, 'CHARACTER SET') && ! str_contains($sql, 'CHARSET')) {
+        if (! empty($this->db->charset) && ! strpos($sql, 'CHARACTER SET') && ! strpos($sql, 'CHARSET')) {
             $sql .= ' DEFAULT CHARACTER SET = ' . $this->db->escapeString($this->db->charset);
         }
 
-        if ($this->db->DBCollat !== '' && ! str_contains($sql, 'COLLATE')) {
+        if (! empty($this->db->DBCollat) && ! strpos($sql, 'COLLATE')) {
             $sql .= ' COLLATE = ' . $this->db->escapeString($this->db->DBCollat);
         }
 
@@ -135,7 +133,8 @@ class Forge extends BaseForge
      * @param array|string $processedFields Processed column definitions
      *                                      or column names to DROP
      *
-     * @return ($alterType is 'DROP' ? string : list<string>)
+     * @return         list<string>|string                            SQL string
+     * @phpstan-return ($alterType is 'DROP' ? string : list<string>)
      */
     protected function _alterTable(string $alterType, string $table, $processedFields)
     {
@@ -221,7 +220,7 @@ class Forge extends BaseForge
                 implode('_', $this->keys[$i]['fields']) :
                 $this->keys[$i]['keyName']);
 
-            if ($asQuery) {
+            if ($asQuery === true) {
                 $sqls[$index] = 'ALTER TABLE ' . $this->db->escapeIdentifiers($table) . " ADD {$unique}KEY "
                     . $keyName
                     . ' (' . implode(', ', $this->db->escapeIdentifiers($this->keys[$i]['fields'])) . ')';
@@ -257,7 +256,7 @@ class Forge extends BaseForge
     {
         $sql = sprintf(
             'ALTER TABLE %s DROP PRIMARY KEY',
-            $this->db->escapeIdentifiers($this->db->DBPrefix . $table),
+            $this->db->escapeIdentifiers($this->db->DBPrefix . $table)
         );
 
         return $this->db->query($sql);

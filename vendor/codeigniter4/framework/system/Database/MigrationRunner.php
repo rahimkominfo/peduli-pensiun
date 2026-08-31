@@ -1,7 +1,5 @@
 <?php
 
-declare(strict_types=1);
-
 /**
  * This file is part of CodeIgniter 4 framework.
  *
@@ -14,13 +12,13 @@ declare(strict_types=1);
 namespace CodeIgniter\Database;
 
 use CodeIgniter\CLI\CLI;
-use CodeIgniter\Database\Exceptions\DatabaseException;
 use CodeIgniter\Events\Events;
 use CodeIgniter\Exceptions\ConfigException;
-use CodeIgniter\Exceptions\RuntimeException;
 use CodeIgniter\I18n\Time;
 use Config\Database;
 use Config\Migrations as MigrationsConfig;
+use Config\Services;
+use RuntimeException;
 use stdClass;
 
 /**
@@ -48,7 +46,7 @@ class MigrationRunner
      *
      * @var string|null
      */
-    protected $namespace = APP_NAMESPACE;
+    protected $namespace;
 
     /**
      * The database Group to migrate.
@@ -103,17 +101,6 @@ class MigrationRunner
     protected $tableChecked = false;
 
     /**
-     * Lock the migration table.
-     */
-    protected bool $lock = false;
-
-    /**
-     * Tracks whether we have already ensured
-     * the lock table exists or not.
-     */
-    protected bool $lockTableChecked = false;
-
-    /**
      * The full path to locate migration files.
      *
      * @var string
@@ -145,9 +132,10 @@ class MigrationRunner
      */
     public function __construct(MigrationsConfig $config, $db = null)
     {
-        $this->enabled = $config->enabled;
-        $this->table   = $config->table;
-        $this->lock    = $config->lock ?? false; // @phpstan-ignore nullCoalesce.property
+        $this->enabled = $config->enabled ?? false;
+        $this->table   = $config->table ?? 'migrations';
+
+        $this->namespace = APP_NAMESPACE;
 
         // Even if a DB connection is passed, since it is a test,
         // it is assumed to use the default group name
@@ -172,66 +160,52 @@ class MigrationRunner
 
         $this->ensureTable();
 
-        // Try to acquire lock - exit gracefully if another process is running migrations
-        if ($this->lock && ! $this->acquireMigrationLock()) {
-            $message             = lang('Migrations.locked');
-            $this->cliMessages[] = "\t" . CLI::color($message, 'yellow');
+        if ($group !== null) {
+            $this->groupFilter = $group;
+            $this->setGroup($group);
+        }
 
+        $migrations = $this->findMigrations();
+
+        if ($migrations === []) {
             return true;
         }
 
-        try {
-            if ($group !== null) {
-                $this->groupFilter = $group;
-                $this->setGroup($group);
-            }
+        foreach ($this->getHistory((string) $group) as $history) {
+            unset($migrations[$this->getObjectUid($history)]);
+        }
 
-            $migrations = $this->findMigrations();
+        $batch = $this->getLastBatch() + 1;
 
-            if ($migrations === []) {
-                return true;
-            }
+        foreach ($migrations as $migration) {
+            if ($this->migrate('up', $migration)) {
+                if ($this->groupSkip === true) {
+                    $this->groupSkip = false;
 
-            foreach ($this->getHistory((string) $group) as $history) {
-                unset($migrations[$this->getObjectUid($history)]);
-            }
-
-            $batch = $this->getLastBatch() + 1;
-
-            foreach ($migrations as $migration) {
-                if ($this->migrate('up', $migration)) {
-                    if ($this->groupSkip === true) {
-                        $this->groupSkip = false;
-
-                        continue;
-                    }
-
-                    $this->addHistory($migration, $batch);
-                } else {
-                    $this->regress(-1);
-
-                    $message = lang('Migrations.generalFault');
-
-                    if ($this->silent) {
-                        $this->cliMessages[] = "\t" . CLI::color($message, 'red');
-
-                        return false;
-                    }
-
-                    throw new RuntimeException($message);
+                    continue;
                 }
-            }
 
-            $data           = get_object_vars($this);
-            $data['method'] = 'latest';
-            Events::trigger('migrate', $data);
+                $this->addHistory($migration, $batch);
+            } else {
+                $this->regress(-1);
 
-            return true;
-        } finally {
-            if ($this->lock) {
-                $this->releaseMigrationLock();
+                $message = lang('Migrations.generalFault');
+
+                if ($this->silent) {
+                    $this->cliMessages[] = "\t" . CLI::color($message, 'red');
+
+                    return false;
+                }
+
+                throw new RuntimeException($message);
             }
         }
+
+        $data           = get_object_vars($this);
+        $data['method'] = 'latest';
+        Events::trigger('migrate', $data);
+
+        return true;
     }
 
     /**
@@ -255,75 +229,45 @@ class MigrationRunner
 
         $this->ensureTable();
 
-        // Try to acquire lock - exit gracefully if another process is running migrations
-        if ($this->lock && ! $this->acquireMigrationLock()) {
-            $message             = lang('Migrations.locked');
-            $this->cliMessages[] = "\t" . CLI::color($message, 'yellow');
+        $batches = $this->getBatches();
 
+        if ($targetBatch < 0) {
+            $targetBatch = $batches[count($batches) - 1 + $targetBatch] ?? 0;
+        }
+
+        if ($batches === [] && $targetBatch === 0) {
             return true;
         }
 
-        try {
-            $batches = $this->getBatches();
+        if ($targetBatch !== 0 && ! in_array($targetBatch, $batches, true)) {
+            $message = lang('Migrations.batchNotFound') . $targetBatch;
 
-            if ($targetBatch < 0) {
-                $targetBatch = $batches[count($batches) - 1 + $targetBatch] ?? 0;
+            if ($this->silent) {
+                $this->cliMessages[] = "\t" . CLI::color($message, 'red');
+
+                return false;
             }
 
-            if ($batches === [] && $targetBatch === 0) {
-                return true;
+            throw new RuntimeException($message);
+        }
+
+        $tmpNamespace = $this->namespace;
+
+        $this->namespace = null;
+        $allMigrations   = $this->findMigrations();
+
+        $migrations = [];
+
+        while ($batch = array_pop($batches)) {
+            if ($batch <= $targetBatch) {
+                break;
             }
 
-            if ($targetBatch !== 0 && ! in_array($targetBatch, $batches, true)) {
-                $message = lang('Migrations.batchNotFound') . $targetBatch;
+            foreach ($this->getBatchHistory($batch, 'desc') as $history) {
+                $uid = $this->getObjectUid($history);
 
-                if ($this->silent) {
-                    $this->cliMessages[] = "\t" . CLI::color($message, 'red');
-
-                    return false;
-                }
-
-                throw new RuntimeException($message);
-            }
-
-            $tmpNamespace = $this->namespace;
-
-            $this->namespace = null;
-            $allMigrations   = $this->findMigrations();
-
-            $migrations = [];
-
-            while ($batch = array_pop($batches)) {
-                if ($batch <= $targetBatch) {
-                    break;
-                }
-
-                foreach ($this->getBatchHistory($batch, 'desc') as $history) {
-                    $uid = $this->getObjectUid($history);
-
-                    if (! isset($allMigrations[$uid])) {
-                        $message = lang('Migrations.gap') . ' ' . $history->version;
-
-                        if ($this->silent) {
-                            $this->cliMessages[] = "\t" . CLI::color($message, 'red');
-
-                            return false;
-                        }
-
-                        throw new RuntimeException($message);
-                    }
-
-                    $migration          = $allMigrations[$uid];
-                    $migration->history = $history;
-                    $migrations[]       = $migration;
-                }
-            }
-
-            foreach ($migrations as $migration) {
-                if ($this->migrate('down', $migration)) {
-                    $this->removeHistory($migration->history);
-                } else {
-                    $message = lang('Migrations.generalFault');
+                if (! isset($allMigrations[$uid])) {
+                    $message = lang('Migrations.gap') . ' ' . $history->version;
 
                     if ($this->silent) {
                         $this->cliMessages[] = "\t" . CLI::color($message, 'red');
@@ -333,57 +277,18 @@ class MigrationRunner
 
                     throw new RuntimeException($message);
                 }
-            }
 
-            $data           = get_object_vars($this);
-            $data['method'] = 'regress';
-            Events::trigger('migrate', $data);
-
-            $this->namespace = $tmpNamespace;
-
-            return true;
-        } finally {
-            if ($this->lock) {
-                $this->releaseMigrationLock();
+                $migration          = $allMigrations[$uid];
+                $migration->history = $history;
+                $migrations[]       = $migration;
             }
         }
-    }
 
-    /**
-     * Migrate a single file regardless of order or batches.
-     * Method "up" or "down" determined by presence in history.
-     * NOTE: This is not recommended and provided mostly for testing.
-     *
-     * @param string $path Full path to a valid migration file
-     * @param string $path Namespace of the target migration
-     *
-     * @return bool
-     */
-    public function force(string $path, string $namespace, ?string $group = null)
-    {
-        if (! $this->enabled) {
-            throw ConfigException::forDisabledMigrations();
-        }
-
-        $this->ensureTable();
-
-        // Try to acquire lock - exit gracefully if another process is running migrations
-        if ($this->lock && ! $this->acquireMigrationLock()) {
-            $message             = lang('Migrations.locked');
-            $this->cliMessages[] = "\t" . CLI::color($message, 'yellow');
-
-            return true;
-        }
-
-        try {
-            if ($group !== null) {
-                $this->groupFilter = $group;
-                $this->setGroup($group);
-            }
-
-            $migration = $this->migrationFromFile($path, $namespace);
-            if ($migration === false) {
-                $message = lang('Migrations.notFound');
+        foreach ($migrations as $migration) {
+            if ($this->migrate('down', $migration)) {
+                $this->removeHistory($migration->history);
+            } else {
+                $message = lang('Migrations.generalFault');
 
                 if ($this->silent) {
                     $this->cliMessages[] = "\t" . CLI::color($message, 'red');
@@ -393,35 +298,41 @@ class MigrationRunner
 
                 throw new RuntimeException($message);
             }
+        }
 
-            $method = 'up';
-            $this->setNamespace($migration->namespace);
+        $data           = get_object_vars($this);
+        $data['method'] = 'regress';
+        Events::trigger('migrate', $data);
 
-            foreach ($this->getHistory($this->group) as $history) {
-                if ($this->getObjectUid($history) === $migration->uid) {
-                    $method             = 'down';
-                    $migration->history = $history;
-                    break;
-                }
-            }
+        $this->namespace = $tmpNamespace;
 
-            if ($method === 'up') {
-                $batch = $this->getLastBatch() + 1;
+        return true;
+    }
 
-                if ($this->migrate('up', $migration) && $this->groupSkip === false) {
-                    $this->addHistory($migration, $batch);
+    /**
+     * Migrate a single file regardless of order or batches.
+     * Method "up" or "down" determined by presence in history.
+     * NOTE: This is not recommended and provided mostly for testing.
+     *
+     * @param string $path Full path to a valid migration file
+     * @param string $path Namespace of the target migration
+     */
+    public function force(string $path, string $namespace, ?string $group = null)
+    {
+        if (! $this->enabled) {
+            throw ConfigException::forDisabledMigrations();
+        }
 
-                    return true;
-                }
+        $this->ensureTable();
 
-                $this->groupSkip = false;
-            } elseif ($this->migrate('down', $migration)) {
-                $this->removeHistory($migration->history);
+        if ($group !== null) {
+            $this->groupFilter = $group;
+            $this->setGroup($group);
+        }
 
-                return true;
-            }
-
-            $message = lang('Migrations.generalFault');
+        $migration = $this->migrationFromFile($path, $namespace);
+        if (empty($migration)) {
+            $message = lang('Migrations.notFound');
 
             if ($this->silent) {
                 $this->cliMessages[] = "\t" . CLI::color($message, 'red');
@@ -430,11 +341,44 @@ class MigrationRunner
             }
 
             throw new RuntimeException($message);
-        } finally {
-            if ($this->lock) {
-                $this->releaseMigrationLock();
+        }
+
+        $method = 'up';
+        $this->setNamespace($migration->namespace);
+
+        foreach ($this->getHistory($this->group) as $history) {
+            if ($this->getObjectUid($history) === $migration->uid) {
+                $method             = 'down';
+                $migration->history = $history;
+                break;
             }
         }
+
+        if ($method === 'up') {
+            $batch = $this->getLastBatch() + 1;
+
+            if ($this->migrate('up', $migration) && $this->groupSkip === false) {
+                $this->addHistory($migration, $batch);
+
+                return true;
+            }
+
+            $this->groupSkip = false;
+        } elseif ($this->migrate('down', $migration)) {
+            $this->removeHistory($migration->history);
+
+            return true;
+        }
+
+        $message = lang('Migrations.generalFault');
+
+        if ($this->silent) {
+            $this->cliMessages[] = "\t" . CLI::color($message, 'red');
+
+            return false;
+        }
+
+        throw new RuntimeException($message);
     }
 
     /**
@@ -444,7 +388,7 @@ class MigrationRunner
      */
     public function findMigrations(): array
     {
-        $namespaces = $this->namespace !== null ? [$this->namespace] : array_keys(service('autoloader')->getNamespace());
+        $namespaces = $this->namespace ? [$this->namespace] : array_keys(Services::autoloader()->getNamespace());
         $migrations = [];
 
         foreach ($namespaces as $namespace) {
@@ -469,7 +413,7 @@ class MigrationRunner
     public function findNamespaceMigrations(string $namespace): array
     {
         $migrations = [];
-        $locator    = service('locator', true);
+        $locator    = Services::locator(true);
 
         if (! empty($this->path)) {
             helper('filesystem');
@@ -499,17 +443,17 @@ class MigrationRunner
      */
     protected function migrationFromFile(string $path, string $namespace)
     {
-        if (! str_ends_with($path, '.php')) {
+        if (substr($path, -4) !== '.php') {
             return false;
         }
 
         $filename = basename($path, '.php');
 
-        if (preg_match($this->regex, $filename) !== 1) {
+        if (! preg_match($this->regex, $filename)) {
             return false;
         }
 
-        $locator = service('locator', true);
+        $locator = Services::locator(true);
 
         $migration = new stdClass();
 
@@ -579,7 +523,7 @@ class MigrationRunner
     {
         preg_match($this->regex, $migration, $matches);
 
-        return $matches !== [] ? $matches[1] : '0';
+        return count($matches) ? $matches[1] : '0';
     }
 
     /**
@@ -594,7 +538,7 @@ class MigrationRunner
     {
         preg_match($this->regex, $migration, $matches);
 
-        return $matches !== [] ? $matches[2] : '';
+        return count($matches) ? $matches[2] : '';
     }
 
     /**
@@ -630,8 +574,6 @@ class MigrationRunner
 
     /**
      * Truncates the history table.
-     *
-     * @return void
      */
     public function clearHistory()
     {
@@ -644,8 +586,6 @@ class MigrationRunner
      * Add a history to the table.
      *
      * @param object $migration
-     *
-     * @return void
      */
     protected function addHistory($migration, int $batch)
     {
@@ -664,7 +604,7 @@ class MigrationRunner
                 CLI::color(lang('Migrations.added'), 'yellow'),
                 $migration->namespace,
                 $migration->version,
-                $migration->class,
+                $migration->class
             );
         }
     }
@@ -673,8 +613,6 @@ class MigrationRunner
      * Removes a single history
      *
      * @param object $history
-     *
-     * @return void
      */
     protected function removeHistory($history)
     {
@@ -686,7 +624,7 @@ class MigrationRunner
                 CLI::color(lang('Migrations.removed'), 'yellow'),
                 $history->namespace,
                 $history->version,
-                $history->class,
+                $history->class
             );
         }
     }
@@ -706,13 +644,13 @@ class MigrationRunner
         }
 
         // If a namespace was specified then use it
-        if ($this->namespace !== null) {
+        if ($this->namespace) {
             $builder->where('namespace', $this->namespace);
         }
 
         $query = $builder->orderBy('id', 'ASC')->get();
 
-        return empty($query) ? [] : $query->getResultObject();
+        return ! empty($query) ? $query->getResultObject() : [];
     }
 
     /**
@@ -729,7 +667,7 @@ class MigrationRunner
             ->orderBy('id', $order)
             ->get();
 
-        return empty($query) ? [] : $query->getResultObject();
+        return ! empty($query) ? $query->getResultObject() : [];
     }
 
     /**
@@ -746,7 +684,7 @@ class MigrationRunner
             ->get()
             ->getResultArray();
 
-        return array_map(intval(...), array_column($batches, 'batch'));
+        return array_map('intval', array_column($batches, 'batch'));
     }
 
     /**
@@ -761,7 +699,7 @@ class MigrationRunner
             ->get()
             ->getResultObject();
 
-        $batch = is_array($batch) && $batch !== []
+        $batch = is_array($batch) && count($batch)
             ? end($batch)->batch
             : 0;
 
@@ -786,7 +724,7 @@ class MigrationRunner
             ->get()
             ->getResultObject();
 
-        return $migration !== [] ? $migration[0]->version : '0';
+        return count($migration) ? $migration[0]->version : '0';
     }
 
     /**
@@ -807,14 +745,12 @@ class MigrationRunner
             ->get()
             ->getResultObject();
 
-        return $migration === [] ? '0' : $migration[0]->version;
+        return count($migration) ? $migration[0]->version : 0;
     }
 
     /**
      * Ensures that we have created our migrations table
      * in the database.
-     *
-     * @return void
      */
     public function ensureTable()
     {
@@ -868,91 +804,6 @@ class MigrationRunner
         $forge->createTable($this->table, true);
 
         $this->tableChecked = true;
-    }
-
-    /**
-     * Ensures that we have created our migration
-     * lock table in the database.
-     *
-     * @return string The lock table name
-     */
-    protected function ensureLockTable(): string
-    {
-        $lockTable = $this->table . '_lock';
-
-        if ($this->lockTableChecked || $this->db->tableExists($lockTable)) {
-            $this->lockTableChecked = true;
-
-            return $lockTable;
-        }
-
-        $forge = Database::forge($this->db);
-
-        $forge->addField([
-            'id' => [
-                'type'           => 'BIGINT',
-                'auto_increment' => true,
-            ],
-            'lock_name' => [
-                'type'       => 'VARCHAR',
-                'constraint' => 255,
-                'null'       => false,
-                'unique'     => true,
-            ],
-            'acquired_at' => [
-                'type' => 'INTEGER',
-                'null' => false,
-            ],
-        ]);
-
-        $forge->addPrimaryKey('id');
-        $forge->createTable($lockTable, true);
-
-        $this->lockTableChecked = true;
-
-        return $lockTable;
-    }
-
-    /**
-     * Acquire exclusive lock on migrations to prevent concurrent execution
-     *
-     * @return bool True if lock was acquired, false if another process holds the lock
-     */
-    protected function acquireMigrationLock(): bool
-    {
-        $lockTable = $this->ensureLockTable();
-
-        try {
-            $this->db->table($lockTable)->insert([
-                'lock_name'   => 'migration_process',
-                'acquired_at' => Time::now()->getTimestamp(),
-            ]);
-
-            return $this->db->insertID() > 0;
-        } catch (DatabaseException) {
-            // Lock already exists or other error
-            return false;
-        }
-    }
-
-    /**
-     * Release migration lock
-     *
-     * @return bool True if successfully released, false on error
-     */
-    protected function releaseMigrationLock(): bool
-    {
-        $lockTable = $this->ensureLockTable();
-
-        $result = $this->db->table($lockTable)
-            ->where('lock_name', 'migration_process')
-            ->delete();
-
-        if ($result === false) {
-            log_message('warning', 'Failed to release migration lock');
-        }
-
-        return $result;
     }
 
     /**

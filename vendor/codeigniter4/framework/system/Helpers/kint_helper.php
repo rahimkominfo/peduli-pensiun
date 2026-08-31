@@ -1,7 +1,5 @@
 <?php
 
-declare(strict_types=1);
-
 /**
  * This file is part of CodeIgniter 4 framework.
  *
@@ -24,7 +22,7 @@ if (! function_exists('dd')) {
          *
          * @codeCoverageIgnore Can't be tested ... exits
          */
-        function dd(...$vars): void
+        function dd(...$vars)
         {
             // @codeCoverageIgnoreStart
             Kint::$aliases[] = 'dd';
@@ -69,14 +67,20 @@ if (! function_exists('trace')) {
         /**
          * Provides a backtrace to the current execution point, from Kint.
          */
-        function trace(): void
+        /**
+         * trace function
+         *
+         * @return void
+         */
+        function trace()
         {
             Kint::$aliases[] = 'trace';
             Kint::trace();
         }
     } else {
+        // In case that Kint is not loaded.
         /**
-         * Generic trace function in case that Kint is not loaded.
+         * trace function
          *
          * @return int
          */

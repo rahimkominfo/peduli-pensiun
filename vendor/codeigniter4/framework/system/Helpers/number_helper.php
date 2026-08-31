@@ -1,7 +1,5 @@
 <?php
 
-declare(strict_types=1);
-
 /**
  * This file is part of CodeIgniter 4 framework.
  *
@@ -10,8 +8,6 @@ declare(strict_types=1);
  * For the full copyright and license information, please view
  * the LICENSE file that was distributed with this source code.
  */
-
-use CodeIgniter\Exceptions\BadFunctionCallException;
 
 // CodeIgniter Number Helpers
 
@@ -29,8 +25,8 @@ if (! function_exists('number_to_size')) {
         // Strip any formatting & ensure numeric input
         try {
             // @phpstan-ignore-next-line
-            $num = 0 + str_replace(',', '', (string) $num);
-        } catch (ErrorException) {
+            $num = 0 + str_replace(',', '', $num);
+        } catch (ErrorException $ee) {
             // Catch "Warning:  A non-numeric value encountered"
             return false;
         }
@@ -84,9 +80,8 @@ if (! function_exists('number_to_amount')) {
         // Strip any formatting & ensure numeric input
         try {
             // @phpstan-ignore-next-line
-            $num = 0 + str_replace(',', '', (string) $num);
-        } catch (ErrorException) {
-            // Catch "Warning:  A non-numeric value encountered"
+            $num = 0 + str_replace(',', '', $num);
+        } catch (ErrorException $ee) {
             return false;
         }
 
@@ -148,7 +143,7 @@ if (! function_exists('format_number')) {
 
         // Try to format it per the locale
         if ($type === NumberFormatter::CURRENCY) {
-            $formatter->setAttribute(NumberFormatter::FRACTION_DIGITS, (float) $options['fraction']);
+            $formatter->setAttribute(NumberFormatter::FRACTION_DIGITS, $options['fraction']);
             $output = $formatter->formatCurrency($num, $options['currency']);
         } else {
             // In order to specify a precision, we'll have to modify

@@ -1,7 +1,5 @@
 <?php
 
-declare(strict_types=1);
-
 /**
  * This file is part of CodeIgniter 4 framework.
  *
@@ -17,32 +15,18 @@ final class FileVarExportHandler
 {
     private string $path = WRITEPATH . 'cache';
 
-    public function save(string $key, mixed $val): void
+    /**
+     * @param array|bool|float|int|object|string|null $val
+     */
+    public function save(string $key, $val): void
     {
         $val = var_export($val, true);
 
-        // Two processes may try to create the directory at the same time.
-        // is_dir() confirms it exists, so suppressing the warning is safe.
-        if (! is_dir($this->path) && ! @mkdir($this->path, 0777, true) && ! is_dir($this->path)) {
-            log_message('error', 'FactoriesCache: cannot create cache directory: ' . $this->path);
-
-            return;
-        }
-
         // Write to temp file first to ensure atomicity
         $tmp = $this->path . "/{$key}." . uniqid('', true) . '.tmp';
-        if (file_put_contents($tmp, '<?php return ' . $val . ';', LOCK_EX) === false) {
-            log_message('warning', 'FactoriesCache: failed to write temp file for key: ' . $key);
+        file_put_contents($tmp, '<?php return ' . $val . ';', LOCK_EX);
 
-            return;
-        }
-
-        // Another process may have wiped the directory. Clean up on failure.
-        if (! @rename($tmp, $this->path . "/{$key}")) {
-            log_message('warning', 'FactoriesCache: failed to commit cache file for key: ' . $key);
-
-            @unlink($tmp);
-        }
+        rename($tmp, $this->path . "/{$key}");
     }
 
     public function delete(string $key): void
@@ -50,7 +34,10 @@ final class FileVarExportHandler
         @unlink($this->path . "/{$key}");
     }
 
-    public function get(string $key): mixed
+    /**
+     * @return array|bool|float|int|object|string|null
+     */
+    public function get(string $key)
     {
         return @include $this->path . "/{$key}";
     }

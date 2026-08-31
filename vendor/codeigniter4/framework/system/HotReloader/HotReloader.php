@@ -1,7 +1,5 @@
 <?php
 
-declare(strict_types=1);
-
 /**
  * This file is part of CodeIgniter 4 framework.
  *
@@ -37,7 +35,7 @@ final class HotReloader
         $appHash = $hasher->hash();
 
         while (true) {
-            if (connection_status() !== CONNECTION_NORMAL || connection_aborted() === 1) {
+            if (connection_status() !== CONNECTION_NORMAL || connection_aborted()) {
                 break;
             }
 
@@ -50,7 +48,6 @@ final class HotReloader
                 $this->sendEvent('reload', ['time' => date('Y-m-d H:i:s')]);
                 break;
             }
-
             if (mt_rand(1, 10) > 8) {
                 $this->sendEvent('ping', ['time' => date('Y-m-d H:i:s')]);
             }

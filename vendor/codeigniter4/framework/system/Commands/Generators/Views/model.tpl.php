@@ -18,10 +18,6 @@ class {class} extends Model
     protected $allowedFields    = [];
 
     protected bool $allowEmptyInserts = false;
-    protected bool $updateOnlyChanged = true;
-
-    protected array $casts = [];
-    protected array $castHandlers = [];
 
     // Dates
     protected $useTimestamps = false;

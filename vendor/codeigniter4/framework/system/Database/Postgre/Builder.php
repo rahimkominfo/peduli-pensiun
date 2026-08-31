@@ -1,7 +1,5 @@
 <?php
 
-declare(strict_types=1);
-
 /**
  * This file is part of CodeIgniter 4 framework.
  *
@@ -14,11 +12,9 @@ declare(strict_types=1);
 namespace CodeIgniter\Database\Postgre;
 
 use CodeIgniter\Database\BaseBuilder;
-use CodeIgniter\Database\BaseResult;
 use CodeIgniter\Database\Exceptions\DatabaseException;
-use CodeIgniter\Database\Query;
 use CodeIgniter\Database\RawSql;
-use CodeIgniter\Exceptions\InvalidArgumentException;
+use InvalidArgumentException;
 
 /**
  * Builder for Postgre
@@ -38,7 +34,7 @@ class Builder extends BaseBuilder
      * Specifies which sql statements
      * support the ignore option.
      *
-     * @var array<string, string>
+     * @var array
      */
     protected $supportedIgnoreStatements = [
         'insert' => 'ON CONFLICT DO NOTHING',
@@ -66,7 +62,7 @@ class Builder extends BaseBuilder
      *
      * @param string $direction ASC, DESC or RANDOM
      *
-     * @return $this
+     * @return BaseBuilder
      */
     public function orderBy(string $orderBy, string $direction = '', ?bool $escape = null)
     {
@@ -91,7 +87,7 @@ class Builder extends BaseBuilder
     /**
      * Increments a numeric column by the specified value.
      *
-     * @return bool
+     * @return mixed
      *
      * @throws DatabaseException
      */
@@ -99,7 +95,7 @@ class Builder extends BaseBuilder
     {
         $column = $this->db->protectIdentifiers($column);
 
-        $sql = $this->_update($this->QBFrom[0], [$column => "CAST({$column} AS numeric) + {$value}"]);
+        $sql = $this->_update($this->QBFrom[0], [$column => "to_number({$column}, '9999999') + {$value}"]);
 
         if (! $this->testMode) {
             $this->resetWrite();
@@ -113,7 +109,7 @@ class Builder extends BaseBuilder
     /**
      * Decrements a numeric column by the specified value.
      *
-     * @return bool
+     * @return mixed
      *
      * @throws DatabaseException
      */
@@ -121,7 +117,7 @@ class Builder extends BaseBuilder
     {
         $column = $this->db->protectIdentifiers($column);
 
-        $sql = $this->_update($this->QBFrom[0], [$column => "CAST({$column} AS numeric) - {$value}"]);
+        $sql = $this->_update($this->QBFrom[0], [$column => "to_number({$column}, '9999999') - {$value}"]);
 
         if (! $this->testMode) {
             $this->resetWrite();
@@ -140,7 +136,7 @@ class Builder extends BaseBuilder
      *
      * @param array|null $set An associative array of insert values
      *
-     * @return BaseResult|false|Query|string
+     * @return mixed
      *
      * @throws DatabaseException
      */
@@ -161,7 +157,7 @@ class Builder extends BaseBuilder
         $table = $this->QBFrom[0];
         $set   = $this->binds;
 
-        array_walk($set, static function (array &$item): void {
+        array_walk($set, static function (array &$item) {
             $item = $item[0];
         });
 
@@ -225,9 +221,9 @@ class Builder extends BaseBuilder
     /**
      * Compiles a delete string and runs the query
      *
-     * @param array<int|string, mixed>|RawSql|string $where
+     * @param mixed $where
      *
-     * @return bool|string
+     * @return mixed
      *
      * @throws DatabaseException
      */
@@ -295,7 +291,7 @@ class Builder extends BaseBuilder
      */
     protected function _like_statement(?string $prefix, string $column, ?string $not, string $bind, bool $insensitiveSearch = false): string
     {
-        $op = $insensitiveSearch ? 'ILIKE' : 'LIKE';
+        $op = $insensitiveSearch === true ? 'ILIKE' : 'LIKE';
 
         return "{$prefix} {$column} {$not} {$op} :{$bind}:";
     }
@@ -305,7 +301,7 @@ class Builder extends BaseBuilder
      *
      * @param RawSql|string $cond
      *
-     * @return $this
+     * @return BaseBuilder
      */
     public function join(string $table, $cond, string $type = '', ?bool $escape = null)
     {
@@ -355,12 +351,12 @@ class Builder extends BaseBuilder
             $sql .= implode(
                 ",\n",
                 array_map(
-                    static fn ($key, $value): string => $key . ($value instanceof RawSql ?
+                    static fn ($key, $value) => $key . ($value instanceof RawSql ?
                             ' = ' . $value :
                             ' = ' . $that->cast($alias . '.' . $value, $that->getFieldType($table, $key))),
                     array_keys($updateFields),
-                    $updateFields,
-                ),
+                    $updateFields
+                )
             ) . "\n";
 
             $sql .= "FROM (\n{:_table_:}";
@@ -370,7 +366,7 @@ class Builder extends BaseBuilder
             $sql .= 'WHERE ' . implode(
                 ' AND ',
                 array_map(
-                    static function ($key, $value) use ($table, $alias, $that): string|RawSql {
+                    static function ($key, $value) use ($table, $alias, $that) {
                         if ($value instanceof RawSql && is_string($key)) {
                             return $table . '.' . $key . ' = ' . $value;
                         }
@@ -383,8 +379,8 @@ class Builder extends BaseBuilder
                             . $that->cast($alias . '.' . $value, $that->getFieldType($table, $value));
                     },
                     array_keys($constraints),
-                    $constraints,
-                ),
+                    $constraints
+                )
             );
 
             $this->QBOptions['sql'] = $sql;
@@ -396,13 +392,13 @@ class Builder extends BaseBuilder
             $data = implode(
                 " UNION ALL\n",
                 array_map(
-                    static fn ($value): string => 'SELECT ' . implode(', ', array_map(
-                        static fn ($key, $index): string => $index . ' ' . $key,
+                    static fn ($value) => 'SELECT ' . implode(', ', array_map(
+                        static fn ($key, $index) => $index . ' ' . $key,
                         $keys,
-                        $value,
+                        $value
                     )),
-                    $values,
-                ),
+                    $values
+                )
             ) . "\n";
         }
 
@@ -413,8 +409,10 @@ class Builder extends BaseBuilder
      * Returns cast expression.
      *
      * @TODO move this to BaseBuilder in 4.5.0
+     *
+     * @param float|int|string $expression
      */
-    private function cast(string $expression, ?string $type): string
+    private function cast($expression, ?string $type): string
     {
         return ($type === null) ? $expression : 'CAST(' . $expression . ' AS ' . strtoupper($type) . ')';
     }
@@ -460,19 +458,20 @@ class Builder extends BaseBuilder
 
         // if this is the first iteration of batch then we need to build skeleton sql
         if ($sql === '') {
-            $fieldNames = array_map(static fn ($columnName): string => trim($columnName, '"'), $keys);
+            $fieldNames = array_map(static fn ($columnName) => trim($columnName, '"'), $keys);
 
             $constraints = $this->QBOptions['constraints'] ?? [];
 
             if (empty($constraints)) {
-                $allIndexes = array_filter($this->db->getIndexData($table), static function ($index) use ($fieldNames): bool {
+                $allIndexes = array_filter($this->db->getIndexData($table), static function ($index) use ($fieldNames) {
                     $hasAllFields = count(array_intersect($index->fields, $fieldNames)) === count($index->fields);
 
                     return ($index->type === 'UNIQUE' || $index->type === 'PRIMARY') && $hasAllFields;
                 });
 
-                foreach ($allIndexes as $index) {
-                    $constraints = $index->fields;
+                foreach (array_map(static fn ($index) => $index->fields, $allIndexes) as $index) {
+                    $constraints[] = current($index);
+                    // only one index can be used?
                     break;
                 }
 
@@ -491,11 +490,11 @@ class Builder extends BaseBuilder
             // autoincrement identity field must use DEFAULT and not NULL
             // this could be removed in favour of leaving to developer but does make things easier and function like other DBMS
             foreach ($constraints as $constraint) {
-                $key = array_search(trim((string) $constraint, '"'), $fieldNames, true);
+                $key = array_search(trim($constraint, '"'), $fieldNames, true);
 
                 if ($key !== false) {
                     foreach ($values as $arrayKey => $value) {
-                        if (strtoupper((string) $value[$key]) === 'NULL') {
+                        if (strtoupper($value[$key]) === 'NULL') {
                             $values[$arrayKey][$key] = 'DEFAULT';
                         }
                     }
@@ -525,12 +524,12 @@ class Builder extends BaseBuilder
             $sql .= implode(
                 ",\n",
                 array_map(
-                    static fn ($key, $value): string => $key . ($value instanceof RawSql ?
+                    static fn ($key, $value) => $key . ($value instanceof RawSql ?
                     " = {$value}" :
                     " = {$alias}.{$value}"),
                     array_keys($updateFields),
-                    $updateFields,
-                ),
+                    $updateFields
+                )
             );
 
             $this->QBOptions['sql'] = $sql;
@@ -576,7 +575,7 @@ class Builder extends BaseBuilder
             $sql .= 'WHERE ' . implode(
                 ' AND ',
                 array_map(
-                    static function ($key, $value) use ($table, $alias, $that): RawSql|string {
+                    static function ($key, $value) use ($table, $alias, $that) {
                         if ($value instanceof RawSql) {
                             return $value;
                         }
@@ -585,24 +584,28 @@ class Builder extends BaseBuilder
                             return $table . '.' . $key . ' = '
                                 . $that->cast(
                                     $alias . '.' . $value,
-                                    $that->getFieldType($table, $key),
+                                    $that->getFieldType($table, $key)
                                 );
                         }
 
                         return $table . '.' . $value . ' = ' . $alias . '.' . $value;
                     },
                     array_keys($constraints),
-                    $constraints,
-                ),
+                    $constraints
+                )
             );
 
             // convert binds in where
-            $this->convertWhereBindsForBatch();
+            foreach ($this->QBWhere as $key => $where) {
+                foreach ($this->binds as $field => $bind) {
+                    $this->QBWhere[$key]['condition'] = str_replace(':' . $field . ':', $bind[0], $where['condition']);
+                }
+            }
 
             $sql .= ' ' . str_replace(
                 'WHERE ',
                 'AND ',
-                $this->compileWhereHaving('QBWhere'),
+                $this->compileWhereHaving('QBWhere')
             );
 
             $this->QBOptions['sql'] = $sql;
@@ -614,13 +617,13 @@ class Builder extends BaseBuilder
             $data = implode(
                 " UNION ALL\n",
                 array_map(
-                    static fn ($value): string => 'SELECT ' . implode(', ', array_map(
-                        static fn ($key, $index): string => $index . ' ' . $key,
+                    static fn ($value) => 'SELECT ' . implode(', ', array_map(
+                        static fn ($key, $index) => $index . ' ' . $key,
                         $keys,
-                        $value,
+                        $value
                     )),
-                    $values,
-                ),
+                    $values
+                )
             ) . "\n";
         }
 

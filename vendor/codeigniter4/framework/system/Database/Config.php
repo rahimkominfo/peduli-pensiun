@@ -1,7 +1,5 @@
 <?php
 
-declare(strict_types=1);
-
 /**
  * This file is part of CodeIgniter 4 framework.
  *
@@ -14,10 +12,12 @@ declare(strict_types=1);
 namespace CodeIgniter\Database;
 
 use CodeIgniter\Config\BaseConfig;
-use CodeIgniter\Exceptions\InvalidArgumentException;
 use Config\Database as DbConfig;
+use InvalidArgumentException;
 
 /**
+ * Class Config
+ *
  * @see \CodeIgniter\Database\ConfigTest
  */
 class Config extends BaseConfig
@@ -67,7 +67,7 @@ class Config extends BaseConfig
             assert(is_string($group));
 
             if (! isset($dbConfig->{$group})) {
-                throw new InvalidArgumentException('"' . $group . '" is not a valid database connection group.');
+                throw new InvalidArgumentException($group . ' is not a valid database connection group.');
             }
 
             $config = $dbConfig->{$group};
@@ -81,9 +81,7 @@ class Config extends BaseConfig
 
         $connection = static::$factory->load($config, $group);
 
-        if ($getShared) {
-            static::$instances[$group] = $connection;
-        }
+        static::$instances[$group] = $connection;
 
         return $connection;
     }
@@ -141,8 +139,6 @@ class Config extends BaseConfig
 
     /**
      * Ensures the database Connection Manager/Factory is loaded and ready to use.
-     *
-     * @return void
      */
     protected static function ensureFactory()
     {
@@ -151,44 +147,5 @@ class Config extends BaseConfig
         }
 
         static::$factory = new Database();
-    }
-
-    /**
-     * Reconnect database connections for worker mode at the start of a request.
-     *
-     * This should be called at the beginning of each request in worker mode,
-     * before the application runs.
-     */
-    public static function reconnectForWorkerMode(): void
-    {
-        foreach (static::$instances as $connection) {
-            $connection->reconnect();
-        }
-    }
-
-    /**
-     * Cleanup database connections for worker mode.
-     *
-     * Rolls back any uncommitted transactions and resets transaction status
-     * to ensure a clean state for the next request.
-     *
-     * Uncommitted transactions at this point indicate a bug in the
-     * application code (transactions should be completed before request ends).
-     *
-     * Called at the END of each request to clean up state.
-     */
-    public static function cleanupForWorkerMode(): void
-    {
-        foreach (static::$instances as $group => $connection) {
-            if ($connection->transDepth > 0) {
-                log_message('error', "Uncommitted transaction detected in database group '{$group}'. Transactions must be completed before request ends.");
-
-                while ($connection->transDepth > 0) {
-                    $connection->transRollback();
-                }
-            }
-
-            $connection->resetTransStatus();
-        }
     }
 }

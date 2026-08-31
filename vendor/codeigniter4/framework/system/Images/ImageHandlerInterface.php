@@ -1,7 +1,5 @@
 <?php
 
-declare(strict_types=1);
-
 /**
  * This file is part of CodeIgniter 4 framework.
  *
@@ -117,21 +115,11 @@ interface ImageHandlerInterface
      *  - shadowColor   Color of the shadow (hex number)
      *  - hAlign        Horizontal alignment: left, center, right
      *  - vAlign        Vertical alignment: top, middle, bottom
-     *
-     * @param array{
-     *     color?: string,
-     *     shadowColor?: string,
-     *     hAlign?: string,
-     *     vAlign?: string,
-     *     hOffset?: int,
-     *     vOffset?: int,
-     *     fontPath?: string,
-     *     fontSize?: int,
-     *     shadowOffset?: int,
-     *     opacity?: float,
-     *     padding?: int,
-     *     withShadow?: bool|string
-     * } $options
+     *  - hOffset
+     *  - vOffset
+     *  - fontPath
+     *  - fontSize
+     *  - shadowOffset
      *
      * @return $this
      */
@@ -149,11 +137,4 @@ interface ImageHandlerInterface
      * @return bool
      */
     public function save(?string $target = null, int $quality = 90);
-
-    /**
-     * Clear metadata before saving image as a new file.
-     *
-     * @return $this
-     */
-    public function clearMetadata(): static;
 }

@@ -1,7 +1,5 @@
 <?php
 
-declare(strict_types=1);
-
 /**
  * This file is part of CodeIgniter 4 framework.
  *
@@ -43,7 +41,7 @@ if (! function_exists('now')) {
             $year,
             $hour,
             $minute,
-            $second,
+            $second
         );
 
         return mktime($hour, $minute, $second, $month, $day, $year);

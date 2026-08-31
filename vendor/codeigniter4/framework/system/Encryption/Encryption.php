@@ -1,7 +1,5 @@
 <?php
 
-declare(strict_types=1);
-
 /**
  * This file is part of CodeIgniter 4 framework.
  *
@@ -22,11 +20,6 @@ use Config\Encryption as EncryptionConfig;
  * Provides two-way keyed encryption via PHP's Sodium and/or OpenSSL extensions.
  * This class determines the driver, cipher, and mode to use, and then
  * initializes the appropriate encryption handler.
- *
- * @property-read string       $digest
- * @property-read string       $driver
- * @property-read list<string> $drivers
- * @property-read string       $key
  *
  * @see \CodeIgniter\Encryption\EncryptionTest
  */
@@ -93,7 +86,7 @@ class Encryption
 
         $this->key    = $config->key;
         $this->driver = $config->driver;
-        $this->digest = $config->digest;
+        $this->digest = $config->digest ?? 'SHA512';
 
         $this->handlers = [
             'OpenSSL' => extension_loaded('openssl'),
@@ -118,7 +111,7 @@ class Encryption
         if ($config instanceof EncryptionConfig) {
             $this->key    = $config->key;
             $this->driver = $config->driver;
-            $this->digest = $config->digest;
+            $this->digest = $config->digest ?? 'SHA512';
         }
 
         if (empty($this->driver)) {
@@ -137,10 +130,6 @@ class Encryption
 
         $handlerName     = 'CodeIgniter\\Encryption\\Handlers\\' . $this->driver . 'Handler';
         $this->encrypter = new $handlerName($config);
-
-        if (($config->previousKeys ?? []) !== []) {
-            $this->encrypter = new KeyRotationDecorator($this->encrypter, $config->previousKeys);
-        }
 
         return $this->encrypter;
     }

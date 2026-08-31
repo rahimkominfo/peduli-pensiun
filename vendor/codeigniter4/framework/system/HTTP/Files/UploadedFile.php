@@ -1,7 +1,5 @@
 <?php
 
-declare(strict_types=1);
-
 /**
  * This file is part of CodeIgniter 4 framework.
  *
@@ -123,8 +121,7 @@ class UploadedFile extends File implements UploadedFileInterface
      * @see http://php.net/move_uploaded_file
      *
      * @param string      $targetPath Path to which to move the uploaded file.
-     * @param string|null $name       The name to rename the file to. When null, the client-provided name is used and sanitized.
-     *                                A caller-supplied name is NOT sanitized.
+     * @param string|null $name       the name to rename the file to.
      * @param bool        $overwrite  State for indicating whether to overwrite the previously generated file with the same
      *                                name or not.
      *
@@ -143,15 +140,12 @@ class UploadedFile extends File implements UploadedFileInterface
             throw HTTPException::forInvalidFile();
         }
 
-        if ($name === null) {
-            helper('security');
-            $name = sanitize_filename($this->getName());
-        }
+        $name ??= $this->getName();
         $destination = $overwrite ? $targetPath . $name : $this->getDestination($targetPath . $name);
 
         try {
             $this->hasMoved = move_uploaded_file($this->path, $destination);
-        } catch (Exception) {
+        } catch (Exception $e) {
             $error   = error_get_last();
             $message = strip_tags($error['message'] ?? '');
 
@@ -306,9 +300,7 @@ class UploadedFile extends File implements UploadedFileInterface
      */
     public function getExtension(): string
     {
-        $guessExtension = $this->guessExtension();
-
-        return $guessExtension !== '' ? $guessExtension : $this->getClientExtension();
+        return $this->guessExtension() ?: $this->getClientExtension();
     }
 
     /**
@@ -329,7 +321,7 @@ class UploadedFile extends File implements UploadedFileInterface
      */
     public function getClientExtension(): string
     {
-        return pathinfo($this->originalName, PATHINFO_EXTENSION);
+        return pathinfo($this->originalName, PATHINFO_EXTENSION) ?? '';
     }
 
     /**

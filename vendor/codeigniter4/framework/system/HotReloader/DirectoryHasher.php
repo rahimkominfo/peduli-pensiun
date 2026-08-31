@@ -1,7 +1,5 @@
 <?php
 
-declare(strict_types=1);
-
 /**
  * This file is part of CodeIgniter 4 framework.
  *
@@ -73,11 +71,9 @@ final class DirectoryHasher
 
         foreach ($iterator as $file) {
             if ($file->isFile()) {
-                $hashes[$file->getRealPath()] = md5_file($file->getRealPath());
+                $hashes[] = md5_file($file->getRealPath());
             }
         }
-
-        ksort($hashes);
 
         return md5(implode('', $hashes));
     }

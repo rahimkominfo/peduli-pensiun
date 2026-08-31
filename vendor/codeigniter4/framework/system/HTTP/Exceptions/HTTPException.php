@@ -1,7 +1,5 @@
 <?php
 
-declare(strict_types=1);
-
 /**
  * This file is part of CodeIgniter 4 framework.
  *
@@ -18,12 +16,12 @@ use CodeIgniter\Exceptions\FrameworkException;
 /**
  * Things that can go wrong with HTTP
  */
-class HTTPException extends FrameworkException implements ExceptionInterface
+class HTTPException extends FrameworkException
 {
     /**
      * For CurlRequest
      *
-     * @return static
+     * @return HTTPException
      *
      * @codeCoverageIgnore
      */
@@ -35,7 +33,7 @@ class HTTPException extends FrameworkException implements ExceptionInterface
     /**
      * For CurlRequest
      *
-     * @return static
+     * @return HTTPException
      */
     public static function forSSLCertNotFound(string $cert)
     {
@@ -45,7 +43,7 @@ class HTTPException extends FrameworkException implements ExceptionInterface
     /**
      * For CurlRequest
      *
-     * @return static
+     * @return HTTPException
      */
     public static function forInvalidSSLKey(string $key)
     {
@@ -190,7 +188,7 @@ class HTTPException extends FrameworkException implements ExceptionInterface
     /**
      * For Uploaded file move
      *
-     * @return static
+     * @return HTTPException
      */
     public static function forAlreadyMoved()
     {
@@ -200,7 +198,7 @@ class HTTPException extends FrameworkException implements ExceptionInterface
     /**
      * For Uploaded file move
      *
-     * @return static
+     * @return HTTPException
      */
     public static function forInvalidFile(?string $path = null)
     {

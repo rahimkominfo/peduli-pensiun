@@ -1,7 +1,5 @@
 <?php
 
-declare(strict_types=1);
-
 /**
  * This file is part of CodeIgniter 4 framework.
  *
@@ -42,9 +40,15 @@ class Honeypot
     {
         $this->config = $config;
 
-        if ($this->config->container === '' || ! str_contains($this->config->container, '{template}')) {
+        if (! $this->config->hidden) {
+            throw HoneypotException::forNoHiddenValue();
+        }
+
+        if ($this->config->container === '' || strpos($this->config->container, '{template}') === false) {
             $this->config->container = '<div style="display:none">{template}</div>';
         }
+
+        $this->config->containerId ??= 'hpc';
 
         if ($this->config->template === '') {
             throw HoneypotException::forNoTemplate();
@@ -83,7 +87,7 @@ class Honeypot
             $this->config->container = str_ireplace(
                 '>{template}',
                 ' id="' . $this->config->containerId . '">{template}',
-                $this->config->container,
+                $this->config->container
             );
         }
 

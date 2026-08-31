@@ -1,7 +1,5 @@
 <?php
 
-declare(strict_types=1);
-
 /**
  * This file is part of CodeIgniter 4 framework.
  *
@@ -14,26 +12,17 @@ declare(strict_types=1);
 namespace CodeIgniter\Test;
 
 use CodeIgniter\Database\BaseBuilder;
-use CodeIgniter\Database\BaseConnection;
 use CodeIgniter\Database\Exceptions\DatabaseException;
-use CodeIgniter\Database\MigrationRunner;
-use CodeIgniter\Database\Seeder;
 use CodeIgniter\Test\Constraints\SeeInDatabase;
 use Config\Database;
 use Config\Migrations;
-use PHPUnit\Framework\Attributes\AfterClass;
+use Config\Services;
 
 /**
  * DatabaseTestTrait
  *
  * Provides functionality for refreshing/seeding
  * the database during testing.
- *
- * @property BaseConnection                 $db
- * @property list<array<int|string, mixed>> $insertCache
- * @property Seeder|null                    $seeder
- * @property MigrationRunner|null           $migrations
- * @property list<string>|string|null       $namespace
  *
  * @mixin CIUnitTestCase
  */
@@ -96,7 +85,7 @@ trait DatabaseTestTrait
             $config          = new Migrations();
             $config->enabled = true;
 
-            $this->migrations = service('migrations', $config, $this->db, false);
+            $this->migrations = Services::migrations($config, $this->db, false);
             $this->migrations->setSilent(false);
         }
 
@@ -237,12 +226,14 @@ trait DatabaseTestTrait
     // --------------------------------------------------------------------
     // Utility
     // --------------------------------------------------------------------
+
     /**
      * Reset $doneMigration and $doneSeed
      *
+     * @afterClass
+     *
      * @return void
      */
-    #[AfterClass]
     public static function resetMigrationSeedCount()
     {
         self::$doneMigration = false;
@@ -270,7 +261,7 @@ trait DatabaseTestTrait
      */
     public function loadBuilder(string $tableName)
     {
-        $builderClass = str_replace('Connection', 'Builder', $this->db::class);
+        $builderClass = str_replace('Connection', 'Builder', get_class($this->db));
 
         return new $builderClass($tableName, $this->db);
     }

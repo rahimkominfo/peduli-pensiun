@@ -1,7 +1,5 @@
 <?php
 
-declare(strict_types=1);
-
 /**
  * This file is part of CodeIgniter 4 framework.
  *
@@ -14,7 +12,7 @@ declare(strict_types=1);
 namespace CodeIgniter\HTTP\Exceptions;
 
 use CodeIgniter\Exceptions\HTTPExceptionInterface;
-use CodeIgniter\Exceptions\RuntimeException;
+use RuntimeException;
 
 /**
  * 400 Bad Request

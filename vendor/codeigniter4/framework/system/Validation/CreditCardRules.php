@@ -1,7 +1,5 @@
 <?php
 
-declare(strict_types=1);
-
 /**
  * This file is part of CodeIgniter 4 framework.
  *
@@ -217,7 +215,7 @@ class CreditCardRules
         $validPrefix = false;
 
         foreach ($prefixes as $prefix) {
-            if (str_starts_with($ccNumber, $prefix)) {
+            if (strpos($ccNumber, $prefix) === 0) {
                 $validPrefix = true;
                 break;
             }

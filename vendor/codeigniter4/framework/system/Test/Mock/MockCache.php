@@ -1,7 +1,5 @@
 <?php
 
-declare(strict_types=1);
-
 /**
  * This file is part of CodeIgniter 4 framework.
  *
@@ -31,7 +29,7 @@ class MockCache extends BaseHandler implements CacheInterface
     /**
      * Expiration times.
      *
-     * @var array<string, int|null>
+     * @var ?list<int>
      */
     protected $expirations = [];
 
@@ -44,8 +42,10 @@ class MockCache extends BaseHandler implements CacheInterface
 
     /**
      * Takes care of any handler-specific setup that must be done.
+     *
+     * @return void
      */
-    public function initialize(): void
+    public function initialize()
     {
     }
 
@@ -56,11 +56,11 @@ class MockCache extends BaseHandler implements CacheInterface
      *
      * @return bool|null
      */
-    public function get(string $key): mixed
+    public function get(string $key)
     {
         $key = static::validateKey($key, $this->prefix);
 
-        return $this->cache[$key] ?? null;
+        return array_key_exists($key, $this->cache) ? $this->cache[$key] : null;
     }
 
     /**
@@ -68,7 +68,7 @@ class MockCache extends BaseHandler implements CacheInterface
      *
      * @return bool|null
      */
-    public function remember(string $key, int $ttl, Closure $callback): mixed
+    public function remember(string $key, int $ttl, Closure $callback)
     {
         $value = $this->get($key);
 
@@ -90,8 +90,11 @@ class MockCache extends BaseHandler implements CacheInterface
      * @param string $key   Cache item name
      * @param mixed  $value the data to save
      * @param int    $ttl   Time To Live, in seconds (default 60)
+     * @param bool   $raw   Whether to store the raw value.
+     *
+     * @return bool
      */
-    public function save(string $key, $value, int $ttl = 60): bool
+    public function save(string $key, $value, int $ttl = 60, bool $raw = false)
     {
         if ($this->bypass) {
             return false;
@@ -107,8 +110,10 @@ class MockCache extends BaseHandler implements CacheInterface
 
     /**
      * Deletes a specific item from the cache store.
+     *
+     * @return bool
      */
-    public function delete(string $key): bool
+    public function delete(string $key)
     {
         $key = static::validateKey($key, $this->prefix);
 
@@ -123,8 +128,10 @@ class MockCache extends BaseHandler implements CacheInterface
 
     /**
      * Deletes items from the cache store matching a given pattern.
+     *
+     * @return int
      */
-    public function deleteMatching(string $pattern): int
+    public function deleteMatching(string $pattern)
     {
         $count = 0;
 
@@ -140,8 +147,10 @@ class MockCache extends BaseHandler implements CacheInterface
 
     /**
      * Performs atomic incrementation of a raw stored value.
+     *
+     * @return bool
      */
-    public function increment(string $key, int $offset = 1): bool
+    public function increment(string $key, int $offset = 1)
     {
         $key  = static::validateKey($key, $this->prefix);
         $data = $this->cache[$key] ?: null;
@@ -157,8 +166,10 @@ class MockCache extends BaseHandler implements CacheInterface
 
     /**
      * Performs atomic decrementation of a raw stored value.
+     *
+     * @return bool
      */
-    public function decrement(string $key, int $offset = 1): bool
+    public function decrement(string $key, int $offset = 1)
     {
         $key = static::validateKey($key, $this->prefix);
 
@@ -175,8 +186,10 @@ class MockCache extends BaseHandler implements CacheInterface
 
     /**
      * Will delete all items in the entire cache.
+     *
+     * @return bool
      */
-    public function clean(): true
+    public function clean()
     {
         $this->cache       = [];
         $this->expirations = [];
@@ -192,7 +205,7 @@ class MockCache extends BaseHandler implements CacheInterface
      *
      * @return list<string> Keys currently present in the store
      */
-    public function getCacheInfo(): array
+    public function getCacheInfo()
     {
         return array_keys($this->cache);
     }
@@ -200,11 +213,10 @@ class MockCache extends BaseHandler implements CacheInterface
     /**
      * Returns detailed information about the specific item in the cache.
      *
-     * @return array{expire: int|null}|null Returns null if the item does not exist,
-     *                                      otherwise, array with the 'expire' key for
-     *                                      absolute epoch expiry (or null).
+     * @return array|null Returns null if the item does not exist, otherwise array<string, mixed>
+     *                    with at least the 'expire' key for absolute epoch expiry (or null).
      */
-    public function getMetaData(string $key): ?array
+    public function getMetaData(string $key)
     {
         // Misses return null
         if (! array_key_exists($key, $this->expirations)) {
