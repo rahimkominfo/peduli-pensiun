@@ -438,7 +438,6 @@ return array(
     'Config\\View' => $baseDir . '/app/Config/View.php',
     'Config\\WorkerMode' => $baseDir . '/app/Config/WorkerMode.php',
     'Laminas\\Escaper\\Escaper' => $vendorDir . '/laminas/laminas-escaper/src/Escaper.php',
-    'Laminas\\Escaper\\EscaperInterface' => $vendorDir . '/laminas/laminas-escaper/src/EscaperInterface.php',
     'Laminas\\Escaper\\Exception\\ExceptionInterface' => $vendorDir . '/laminas/laminas-escaper/src/Exception/ExceptionInterface.php',
     'Laminas\\Escaper\\Exception\\InvalidArgumentException' => $vendorDir . '/laminas/laminas-escaper/src/Exception/InvalidArgumentException.php',
     'Laminas\\Escaper\\Exception\\RuntimeException' => $vendorDir . '/laminas/laminas-escaper/src/Exception/RuntimeException.php',
