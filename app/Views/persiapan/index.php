@@ -30,10 +30,12 @@
           </a>
         <?php endif; ?>
 
+        <?php if (can_create_persiapan()): ?>
         <button type="button" onclick="document.getElementById('modalTambah').classList.remove('hidden')" class="bg-secondary text-on-secondary flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-lg font-label-md hover:bg-secondary-container transition-colors shadow-sm whitespace-nowrap">
           <i class="fa-solid fa-plus text-[16px]"></i>
           Tambah
         </button>
+        <?php endif; ?>
       </div>
     </div>
 
@@ -41,14 +43,29 @@
     <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 border-t border-outline-variant/20">
       <!-- Filter Unit Kerja -->
       <div class="relative">
-        <select name="unit" onchange="this.form.submit()" class="w-full appearance-none bg-surface-container-highest text-on-surface text-body-md pl-3.5 pr-8 py-2 rounded-lg outline-none focus:ring-2 focus:ring-primary transition-all">
-          <option value="">Semua Unit Kerja</option>
-          <option value="Dinas Pendidikan" <?= (($filters['unit'] ?? '') === 'Dinas Pendidikan') ? 'selected' : '' ?>>Dinas Pendidikan</option>
-          <option value="Dinas Kesehatan" <?= (($filters['unit'] ?? '') === 'Dinas Kesehatan') ? 'selected' : '' ?>>Dinas Kesehatan</option>
-          <option value="Dinas Pekerjaan Umum" <?= (($filters['unit'] ?? '') === 'Dinas Pekerjaan Umum') ? 'selected' : '' ?>>Dinas Pekerjaan Umum</option>
-          <option value="BKPSDM" <?= (($filters['unit'] ?? '') === 'BKPSDM') ? 'selected' : '' ?>>BKPSDM</option>
-        </select>
-        <i class="fa-solid fa-caret-down absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none text-[14px]"></i>
+        <?php if (is_admin_unit()): ?>
+          <div class="flex items-center bg-surface-container-highest text-on-surface text-body-md px-3.5 py-2 rounded-lg gap-2 border border-outline-variant/30" title="Unit Kerja Anda">
+            <i class="fa-solid fa-building text-primary text-[14px]"></i>
+            <span class="truncate font-medium"><?= esc(session('user_unit') ?? 'Unit Anda') ?></span>
+          </div>
+        <?php else: ?>
+          <select name="unit" onchange="this.form.submit()" class="w-full appearance-none bg-surface-container-highest text-on-surface text-body-md pl-3.5 pr-8 py-2 rounded-lg outline-none focus:ring-2 focus:ring-primary transition-all">
+            <option value="">Semua Unit Kerja</option>
+            <?php if (!empty($unitList)): ?>
+              <?php foreach ($unitList as $u): ?>
+                <option value="<?= esc($u['UNIT_NAMA']) ?>" <?= (($filters['unit'] ?? '') === $u['UNIT_NAMA']) ? 'selected' : '' ?>>
+                  <?= esc($u['UNIT_NAMA']) ?>
+                </option>
+              <?php endforeach; ?>
+            <?php else: ?>
+              <option value="Dinas Pendidikan" <?= (($filters['unit'] ?? '') === 'Dinas Pendidikan') ? 'selected' : '' ?>>Dinas Pendidikan</option>
+              <option value="Dinas Kesehatan" <?= (($filters['unit'] ?? '') === 'Dinas Kesehatan') ? 'selected' : '' ?>>Dinas Kesehatan</option>
+              <option value="Dinas Pekerjaan Umum" <?= (($filters['unit'] ?? '') === 'Dinas Pekerjaan Umum') ? 'selected' : '' ?>>Dinas Pekerjaan Umum</option>
+              <option value="BKPSDM" <?= (($filters['unit'] ?? '') === 'BKPSDM') ? 'selected' : '' ?>>BKPSDM</option>
+            <?php endif; ?>
+          </select>
+          <i class="fa-solid fa-caret-down absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none text-[14px]"></i>
+        <?php endif; ?>
       </div>
 
       <!-- Filter Progres -->
@@ -167,6 +184,7 @@
 
 </div>
 
+<?php if (can_create_persiapan()): ?>
 <!-- Modal Tambah Data Pegawai -->
 <div id="modalTambah" class="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 hidden">
   <div class="bg-surface-container-lowest rounded-2xl shadow-2xl w-full max-w-md p-6 flex flex-col gap-4 max-h-[90vh] overflow-y-auto">
@@ -184,6 +202,16 @@
         <label class="text-label-sm font-label-sm text-on-surface">Nomor Induk Pegawai (NIP)</label>
         <input type="text" name="nip" placeholder="Masukkan 18 digit NIP" required class="bg-surface-container-low px-3 py-2.5 rounded-lg outline-none text-body-md focus:ring-2 focus:ring-primary"/>
       </div>
+
+      <?php if (is_admin_unit()): ?>
+      <div class="flex flex-col gap-1">
+        <label class="text-label-sm font-label-sm text-on-surface">Unit Kerja</label>
+        <div class="bg-surface-container-high px-3 py-2.5 rounded-lg text-body-md text-on-surface-variant flex items-center gap-2 border border-outline-variant/30">
+          <i class="fa-solid fa-building text-primary text-[14px]"></i>
+          <span><?= esc(session('user_unit') ?? 'Unit Anda') ?></span>
+        </div>
+      </div>
+      <?php endif; ?>
 
       <div class="flex flex-col gap-1">
         <label class="text-label-sm font-label-sm text-on-surface">Tanggal Pensiun</label>
@@ -210,6 +238,7 @@
     </form>
   </div>
 </div>
+<?php endif; ?>
 
 <!-- Modal Update Progres Pegawai -->
 <div id="modalUpdateProgres" class="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 hidden">

@@ -46,6 +46,9 @@ class PpDataModel extends Model
             if (!empty($filters['unit']) && $filters['unit'] !== 'semua_unit') {
                 $builder->like('d.UNIT_NAMA', $filters['unit']);
             }
+            if (!empty($filters['unit_id'])) {
+                $builder->where('d.UNIT_ID', (int)$filters['unit_id']);
+            }
             if (!empty($filters['progres'])) {
                 $builder->where('pd.PPR_KODE', $filters['progres']);
             }
@@ -89,9 +92,15 @@ class PpDataModel extends Model
     /**
      * Summary stats for dashboard
      */
-    public function getSummaryStats()
+    public function getSummaryStats($unitId = null)
     {
-        $totalPns = $this->countAllResults();
+        $builder = $this->builder();
+        if ($unitId !== null && (int)$unitId > 0) {
+            $builder->where('UNIT_ID', (int)$unitId);
+        }
+        $totalPns = $builder->countAllResults();
+
+        $whereClause = ($unitId !== null && (int)$unitId > 0) ? "WHERE d.UNIT_ID = " . (int)$unitId : "";
 
         // Get highest progress code achieved for each active employee in PP_DATA
         $query = $this->db->query("
@@ -104,6 +113,7 @@ class PpDataModel extends Model
                     COALESCE(MAX(p.PPR_KODE), 1) as max_kode
                 FROM PP_DATA d
                 LEFT JOIN PP_PROGRES_DATA p ON p.PP_ID = d.PP_ID
+                {$whereClause}
                 GROUP BY d.PP_ID
             ) latest
             GROUP BY latest.max_kode

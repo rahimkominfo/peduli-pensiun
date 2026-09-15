@@ -9,6 +9,26 @@
     <!-- <p class="text-body-md text-on-surface-variant">Berikut adalah ringkasan progres usulan pensiun dari database server lokal hari ini.</p> -->
   </section>
 
+  <?php $myPensiun = get_user_pensiun_data(); ?>
+  <?php if (!is_admin_kabupaten() && !is_admin_unit() && $myPensiun): ?>
+  <!-- Banner Akses Data Pensiun Pribadi -->
+  <div class="bg-primary/10 border border-primary/20 rounded-xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs">
+    <div class="flex items-center gap-3">
+      <div class="w-10 h-10 rounded-full bg-primary text-on-primary flex items-center justify-center shrink-0">
+        <i class="fa-solid fa-file-signature text-[18px]"></i>
+      </div>
+      <div class="flex flex-col">
+        <span class="text-body-md font-bold text-on-surface">Data Usulan Pensiun Anda</span>
+        <span class="text-body-sm text-on-surface-variant">Status usulan dan kelengkapan berkas pensiun Anda siap diverifikasi.</span>
+      </div>
+    </div>
+    <a href="<?= base_url('data-verifikasi/' . $myPensiun['PP_ID']) ?>" class="bg-primary text-on-primary font-label-md px-4 py-2 rounded-lg hover:bg-primary-container transition-colors shadow-sm whitespace-nowrap">
+      Buka Berkas Saya
+      <i class="fa-solid fa-arrow-right text-[12px] ml-1"></i>
+    </a>
+  </div>
+  <?php endif; ?>
+
   <!-- Stat Cards Grid (Live Data from pensiun_db) -->
   <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-5">
     <!-- Card 1: JUMLAH PENGUSULAN OPD -->
@@ -79,9 +99,11 @@
             <span class="text-body-md font-semibold text-on-surface"><?= esc($item['NAMA']) ?></span>
             <span class="text-label-sm text-on-surface-variant">NIP: <?= esc($item['NIP']) ?> • <?= esc($item['UNIT_NAMA']) ?></span>
           </div>
+          <?php if (can_access_verifikasi() && can_access_candidate($item)): ?>
           <a href="<?= base_url('data-verifikasi/' . $item['PP_ID']) ?>" class="px-3 py-1.5 bg-primary/10 text-primary text-label-sm font-semibold rounded-lg hover:bg-primary/20 transition-colors">
             Detail
           </a>
+          <?php endif; ?>
         </div>
       <?php endforeach; ?>
     </div>

@@ -182,11 +182,13 @@
         <span class="text-label-sm">Persiapan</span>
       </a>
       <?php endif; ?>
+      <?php if (can_access_verifikasi()): ?>
       <a href="<?= base_url('data-verifikasi') ?>" 
          class="flex flex-col items-center justify-center gap-1 min-w-[64px] h-full transition-all <?= ($activeMenu ?? '') === 'verifikasi' ? 'text-primary font-bold' : 'text-on-surface-variant' ?>">
         <i class="fa-solid fa-file-circle-check text-[18px]"></i>
         <span class="text-label-sm">Verifikasi</span>
       </a>
+      <?php endif; ?>
       <a href="<?= base_url('dokumen') ?>" 
          class="flex flex-col items-center justify-center gap-1 min-w-[64px] h-full transition-all <?= ($activeMenu ?? '') === 'dokumen' ? 'text-primary font-bold' : 'text-on-surface-variant' ?>">
         <i class="fa-solid fa-folder-open text-[18px]"></i>

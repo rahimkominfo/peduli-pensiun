@@ -21,6 +21,25 @@
     <?php endif; ?>
   </div>
 
+  <?php if (!empty($unitCandidates) && count($unitCandidates) > 1): ?>
+  <!-- Switcher Pegawai dalam Unit -->
+  <div class="bg-surface-container-lowest rounded-xl shadow-sm p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 border border-outline-variant/30">
+    <label for="pilihPegawai" class="text-label-md font-semibold text-on-surface flex items-center gap-2 whitespace-nowrap">
+      <i class="fa-solid fa-users text-primary text-[15px]"></i>
+      <span>Pilih Pegawai (<?= esc($candidate['UNIT_NAMA']) ?>):</span>
+    </label>
+    <div class="flex-1 sm:max-w-md w-full">
+      <select id="pilihPegawai" onchange="if(this.value) window.location.href='<?= base_url('data-verifikasi') ?>/' + this.value" class="w-full bg-surface-container-low border border-outline-variant/50 text-body-sm font-medium text-on-surface rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-primary/20 cursor-pointer transition-all">
+        <?php foreach ($unitCandidates as $uc): ?>
+          <option value="<?= $uc['PP_ID'] ?>" <?= (int)$uc['PP_ID'] === (int)$candidate['PP_ID'] ? 'selected' : '' ?>>
+            <?= esc($uc['NAMA']) ?> - NIP: <?= esc($uc['NIP']) ?>
+          </option>
+        <?php endforeach; ?>
+      </select>
+    </div>
+  </div>
+  <?php endif; ?>
+
   <!-- Profile Card (Live Data from pensiun_db) -->
   <div class="bg-surface-container rounded-xl shadow-sm p-4 flex gap-4 items-center relative overflow-hidden">
     <div class="absolute inset-0 bg-gradient-to-r from-primary/5 to-transparent"></div>
@@ -153,11 +172,13 @@
                   <span>Lihat</span>
                 </a>
 
-                <!-- Tombol Edit / Unggah Ulang File -->
+                <!-- Tombol Edit / Unggah Ulang File (sembunyikan jika status sudah Disetujui) -->
+                <?php if ($status !== 1): ?>
                 <button type="button" onclick="openUploadModal('<?= $doc['DOKJES_ID'] ?>', '<?= esc($doc['NM_DOKUMEN'], 'js') ?>')" class="bg-surface-container-high text-on-surface px-3 py-1.5 rounded-lg text-label-sm font-label-sm flex items-center gap-1.5 hover:bg-surface-variant transition-colors shadow-sm">
                   <i class="fa-solid fa-pen-to-square text-[14px]"></i>
                   <span>Edit</span>
                 </button>
+                <?php endif; ?>
               </div>
 
               <?php if (can_approve_dokumen()): ?>

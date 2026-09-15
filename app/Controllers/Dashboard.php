@@ -12,10 +12,16 @@ class Dashboard extends BaseController
         $ppDataModel = new PpDataModel();
         $progresModel = new PpProgresDataModel();
 
-        $stats = $ppDataModel->getSummaryStats();
+        $unitId = is_admin_unit() ? (int) (session('unit_id') ?? 0) : null;
+
+        $stats = $ppDataModel->getSummaryStats($unitId);
         
         // Latest candidates
-        $candidates = $ppDataModel->getWithProgres();
+        $filters = [];
+        if ($unitId !== null && $unitId > 0) {
+            $filters['unit_id'] = $unitId;
+        }
+        $candidates = $ppDataModel->getWithProgres($filters);
 
         $data = [
             'title'      => 'Dashboard - Peduli Pensiun',

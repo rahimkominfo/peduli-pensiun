@@ -26,10 +26,22 @@ class Persiapan extends BaseController
             'keyword' => $this->request->getGet('keyword') ?? '',
         ];
 
+        // Jika login sebagai admin_unit, kunci akses hanya ke unit miliknya sendiri
+        if (is_admin_unit()) {
+            $userUnitId = (int) (session('unit_id') ?? 0);
+            $filters['unit_id'] = $userUnitId;
+            unset($filters['unit']);
+        }
+
         $candidates = $ppDataModel->getWithProgres($filters);
         $jenisList  = $ppJenisModel->findAll();
         $refProgres = $progresRef->findAll();
         $yearsList  = $ppDataModel->getAvailableYears();
+
+        $unitList = [];
+        if (!is_admin_unit()) {
+            $unitList = $ppDataModel->select('UNIT_NAMA')->distinct()->where('UNIT_NAMA IS NOT NULL')->orderBy('UNIT_NAMA', 'ASC')->findAll();
+        }
 
         $data = [
             'title'        => 'Data Persiapan - Peduli Pensiun',
@@ -38,8 +50,9 @@ class Persiapan extends BaseController
             'jenisList'    => $jenisList,
             'refProgres'   => $refProgres,
             'yearsList'    => $yearsList,
+            'unitList'     => $unitList,
             'filters'      => $filters,
-            'selectedUnit' => $filters['unit'],
+            'selectedUnit' => $filters['unit'] ?? '',
             'totalCount'   => count($candidates),
         ];
 
@@ -48,8 +61,8 @@ class Persiapan extends BaseController
 
     public function create()
     {
-        if (!can_access_persiapan()) {
-            return redirect()->to('/dashboard')->with('error', 'Anda tidak memiliki hak akses untuk menambah data.');
+        if (!can_create_persiapan()) {
+            return redirect()->to('/data-persiapan')->with('error', 'Anda tidak memiliki hak akses untuk menambah data.');
         }
 
         $ppDataModel = new PpDataModel();
@@ -67,14 +80,22 @@ class Persiapan extends BaseController
             return redirect()->back()->withInput()->with('error', 'Tanggal Pensiun wajib diisi!');
         }
 
+        $unitId   = 1;
+        $unitNama = 'BKPSDM';
+
+        if (is_admin_unit()) {
+            $unitId   = (int) (session('unit_id') ?? 0);
+            $unitNama = (string) (session('user_unit') ?? 'Unit Pegawai');
+        }
+
         $insertData = [
             'PPJ_ID'      => $ppjId ?: 1,
             'NIP'         => $nip,
             'NAMA'        => 'Pegawai NIP ' . $nip,
             'PANGKAT'     => 'Penata Muda / III/a',
             'JABATAN'     => 'Pegawai ASN',
-            'UNIT_ID'     => 1,
-            'UNIT_NAMA'   => 'BKPSDM',
+            'UNIT_ID'     => $unitId,
+            'UNIT_NAMA'   => $unitNama,
             'NO_HP'       => '',
             'NO_HP_SI'    => '',
             'EMAIL'       => null,
@@ -101,6 +122,17 @@ class Persiapan extends BaseController
     {
         if (!can_access_persiapan()) {
             return redirect()->to('/dashboard')->with('error', 'Anda tidak memiliki hak akses untuk memperbarui progres.');
+        }
+
+        $ppDataModel = new PpDataModel();
+        $candidate   = $ppDataModel->find($id);
+
+        if (!$candidate) {
+            return redirect()->to('/data-persiapan')->with('error', 'Data pegawai tidak ditemukan.');
+        }
+
+        if (!can_access_unit($candidate['UNIT_ID'])) {
+            return redirect()->to('/data-persiapan')->with('error', 'Anda tidak memiliki hak akses ke data unit ini.');
         }
 
         $progresModel = new PpProgresDataModel();
